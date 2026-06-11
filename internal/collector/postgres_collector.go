@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/okumujustine/postgresome/internal/metrics"
 	"github.com/okumujustine/postgresome/internal/model"
 )
 
@@ -30,7 +31,7 @@ func (c *PostgresCollector) GetDatabaseInfo(ctx context.Context) (*model.Databas
 	}, nil
 }
 
-func (c *PostgresCollector) GetDatabaseStats(ctx context.Context) (*model.DatabaseStats, error) {
+func (c *PostgresCollector) GetDatabaseStats(ctx context.Context) (*metrics.DatabaseStats, error) {
 	query := `
 		SELECT
 			datname,
@@ -48,7 +49,7 @@ func (c *PostgresCollector) GetDatabaseStats(ctx context.Context) (*model.Databa
 		WHERE datname = current_database();
 	`
 
-	var stats model.DatabaseStats
+	var stats metrics.DatabaseStats
 
 	err := c.pool.QueryRow(ctx, query).Scan(
 		&stats.DatabaseName,

@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/okumujustine/postgresome/internal/collector"
-	"github.com/okumujustine/postgresome/internal/model"
+	"github.com/okumujustine/postgresome/internal/metrics"
 )
 
 type Runner struct {
@@ -69,7 +69,7 @@ func (r *Runner) Start(ctx context.Context) error {
 	}
 }
 
-func printDatabaseStats(stats *model.DatabaseStats) {
+func printDatabaseStats(stats *metrics.DatabaseStats) {
 	fmt.Printf("Database: %s\n", stats.DatabaseName)
 	fmt.Printf("Connections: %d\n", stats.ActiveConnections)
 	fmt.Printf("Commits: %d\n", stats.TransactionCommits)
