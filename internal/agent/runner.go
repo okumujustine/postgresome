@@ -65,6 +65,15 @@ func (r *Runner) Start(ctx context.Context) error {
 			}
 
 			printDatabaseStats(stats)
+
+			dimensions := map[string]string{
+				"database_name": stats.DatabaseName,
+				"agent_id":      "local-agent",
+				"environment":   "development",
+			}
+
+			points := metrics.DatabaseStatsToMetricPoints(stats, time.Now(), dimensions)
+			printMetricPoints(points)
 		}
 	}
 }
@@ -82,4 +91,17 @@ func printDatabaseStats(stats *metrics.DatabaseStats) {
 	fmt.Printf("Rows Updated: %d\n", stats.RowsUpdated)
 	fmt.Printf("Rows Deleted: %d\n", stats.RowsDeleted)
 	fmt.Println("--------------------------------")
+}
+
+func printMetricPoints(points []metrics.MetricPoint) {
+	fmt.Println("MetricPoints:")
+	for _, point := range points {
+		fmt.Printf("Metric: %s\n", point.Label)
+		fmt.Printf("Key: %s\n", point.Key)
+		fmt.Printf("Value: %v\n", point.Value)
+		fmt.Printf("Unit: %s\n", point.Unit)
+		fmt.Printf("Category: %s\n", point.Category)
+		fmt.Printf("Dimensions: %v\n", point.Dimensions)
+		fmt.Println("--------------------------------")
+	}
 }
