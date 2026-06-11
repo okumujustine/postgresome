@@ -48,6 +48,8 @@ func (r *Runner) Start(ctx context.Context) error {
 	ticker := time.NewTicker(r.interval)
 	defer ticker.Stop()
 
+	var previousStats *metrics.DatabaseStats
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -66,14 +68,25 @@ func (r *Runner) Start(ctx context.Context) error {
 
 			printDatabaseStats(stats)
 
+			collectedAt := time.Now()
+
 			dimensions := map[string]string{
 				"database_name": stats.DatabaseName,
 				"agent_id":      "local-agent",
 				"environment":   "development",
 			}
 
-			points := metrics.DatabaseStatsToMetricPoints(stats, time.Now(), dimensions)
+			points := metrics.DatabaseStatsToMetricPoints(stats, collectedAt, dimensions)
 			printMetricPoints(points)
+
+			if previousStats == nil {
+				fmt.Println("Waiting for next collection cycle to calculate metric changes")
+			} else {
+				delta := metrics.CalculateDatabaseDelta(previousStats, stats, collectedAt, stats.DatabaseName)
+				printDatabaseDelta(delta)
+			}
+
+			previousStats = stats
 		}
 	}
 }
@@ -90,6 +103,27 @@ func printDatabaseStats(stats *metrics.DatabaseStats) {
 	fmt.Printf("Rows Inserted: %d\n", stats.RowsInserted)
 	fmt.Printf("Rows Updated: %d\n", stats.RowsUpdated)
 	fmt.Printf("Rows Deleted: %d\n", stats.RowsDeleted)
+	fmt.Println("--------------------------------")
+}
+
+func printDatabaseDelta(delta metrics.DatabaseMetricDelta) {
+	fmt.Println("Transactions since last collection:")
+	fmt.Printf("+%d commits\n", delta.TransactionCommitsDelta)
+	fmt.Printf("+%d rollbacks\n", delta.TransactionRollbacksDelta)
+	fmt.Println()
+
+	fmt.Println("Rows changed:")
+	fmt.Printf("+%d inserted\n", delta.RowsInsertedDelta)
+	fmt.Printf("+%d updated\n", delta.RowsUpdatedDelta)
+	fmt.Printf("+%d deleted\n", delta.RowsDeletedDelta)
+	fmt.Println()
+
+	fmt.Println("Cache:")
+	fmt.Printf("%.1f%% hit ratio\n", delta.CacheHitRatio*100)
+	fmt.Println()
+
+	fmt.Println("Transaction Health:")
+	fmt.Printf("%.1f%% rollback rate\n", delta.RollbackRate*100)
 	fmt.Println("--------------------------------")
 }
 
