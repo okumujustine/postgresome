@@ -12,12 +12,14 @@ import (
 	"github.com/okumujustine/postgresome/internal/analysis/rules"
 	"github.com/okumujustine/postgresome/internal/collector"
 	"github.com/okumujustine/postgresome/internal/collector/activity"
+	"github.com/okumujustine/postgresome/internal/collector/tables"
 	"github.com/okumujustine/postgresome/internal/metrics"
 )
 
 const (
 	maxSampleSessions     = 5
 	maxQueryPreviewLength = 80
+	maxTableSummaryItems  = 5
 )
 
 type Runner struct {
@@ -45,6 +47,7 @@ func (r *Runner) Start(ctx context.Context) error {
 
 	postgresCollector := collector.NewPostgresCollector(pool)
 	activityCollector := activity.NewActivityCollector(pool)
+	tableStatsCollector := tables.NewTableStatsCollector(pool)
 
 	info, err := postgresCollector.GetDatabaseInfo(ctx)
 	if err != nil {
@@ -61,6 +64,7 @@ func (r *Runner) Start(ctx context.Context) error {
 
 	engine := analysis.NewEngine(rules.HighConnectionRule{}, rules.LowCacheHitRatioRule{}, rules.HighRollbackRateRule{})
 	engine.RegisterActivityRules(rules.IdleConnectionRule{}, rules.LongRunningQueryRule{}, rules.BlockedQueryRule{})
+	engine.RegisterTableRules(rules.AutovacuumLagRule{}, rules.HighSequentialScanRule{})
 
 	var previousStats *metrics.DatabaseStats
 
@@ -93,6 +97,17 @@ func (r *Runner) Start(ctx context.Context) error {
 				printDatabaseActivity(activitySnapshot)
 			}
 
+			tableStatsCtx, tableStatsCancel := context.WithTimeout(ctx, 5*time.Second)
+			tableStatsSnapshot, err := tableStatsCollector.GetTableStats(tableStatsCtx)
+			tableStatsCancel()
+
+			if err != nil {
+				fmt.Printf("failed to collect table stats: %v\n", err)
+			} else {
+				tableStatsSnapshot.DatabaseInstanceID = stats.DatabaseName
+				printTableHealthSummary(tableStatsSnapshot)
+			}
+
 			collectedAt := time.Now()
 
 			dimensions := map[string]string{
@@ -121,6 +136,10 @@ func (r *Runner) Start(ctx context.Context) error {
 
 			if activitySnapshot != nil {
 				findings = append(findings, engine.AnalyzeDatabaseActivity(*activitySnapshot)...)
+			}
+
+			if tableStatsSnapshot != nil {
+				findings = append(findings, engine.AnalyzeTableStats(*tableStatsSnapshot)...)
 			}
 
 			printFindings(findings)
@@ -272,6 +291,53 @@ func printFindings(findings []analysis.Finding) {
 		fmt.Println(finding.Recommendation)
 		fmt.Println("--------------------------------")
 	}
+}
+
+func printTableHealthSummary(snapshot *metrics.TableStatsSnapshot) {
+	fmt.Println("Table Health Summary:")
+	fmt.Println()
+	fmt.Printf("Total Tables: %d\n", len(snapshot.Tables))
+	fmt.Println()
+
+	byDeadRows := make([]metrics.TableStats, len(snapshot.Tables))
+	copy(byDeadRows, snapshot.Tables)
+	sort.Slice(byDeadRows, func(i, j int) bool {
+		return byDeadRows[i].DeadRows > byDeadRows[j].DeadRows
+	})
+
+	fmt.Println("Top tables by dead rows:")
+	fmt.Println()
+	for i, table := range byDeadRows {
+		if i >= maxTableSummaryItems {
+			break
+		}
+
+		fmt.Printf("%d. %s.%s\n", i+1, table.SchemaName, table.TableName)
+		fmt.Printf("   Live Rows: %d\n", table.LiveRows)
+		fmt.Printf("   Dead Rows: %d\n", table.DeadRows)
+		fmt.Println()
+	}
+
+	bySequentialScans := make([]metrics.TableStats, len(snapshot.Tables))
+	copy(bySequentialScans, snapshot.Tables)
+	sort.Slice(bySequentialScans, func(i, j int) bool {
+		return bySequentialScans[i].SequentialScans > bySequentialScans[j].SequentialScans
+	})
+
+	fmt.Println("Top tables by sequential scans:")
+	fmt.Println()
+	for i, table := range bySequentialScans {
+		if i >= maxTableSummaryItems {
+			break
+		}
+
+		fmt.Printf("%d. %s.%s\n", i+1, table.SchemaName, table.TableName)
+		fmt.Printf("   Sequential Scans: %d\n", table.SequentialScans)
+		fmt.Printf("   Sequential Rows Read: %d\n", table.SequentialRowsRead)
+		fmt.Println()
+	}
+
+	fmt.Println("--------------------------------")
 }
 
 func printMetricPoints(points []metrics.MetricPoint) {

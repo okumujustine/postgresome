@@ -26,3 +26,11 @@ type ActivityRule interface {
 	Name() string
 	Analyze(snapshot metrics.DatabaseActivitySnapshot) []analysis.Finding
 }
+
+// TableRule inspects a snapshot of pg_stat_user_tables statistics and
+// reports zero or more findings. Implementations satisfy analysis.TableRule
+// and can be registered with an analysis.Engine via RegisterTableRules.
+type TableRule interface {
+	Name() string
+	Analyze(snapshot metrics.TableStatsSnapshot) []analysis.Finding
+}
