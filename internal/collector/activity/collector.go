@@ -28,6 +28,8 @@ func (c *ActivityCollector) GetDatabaseActivity(ctx context.Context) (*metrics.D
 			client_addr::text,
 			state,
 			query,
+			wait_event_type,
+			wait_event,
 			backend_start,
 			query_start,
 			state_change
@@ -52,6 +54,8 @@ func (c *ActivityCollector) GetDatabaseActivity(ctx context.Context) (*metrics.D
 			clientAddress    *string
 			state            *string
 			queryText        *string
+			waitEventType    *string
+			waitEvent        *string
 			backendStartedAt time.Time
 			queryStartedAt   *time.Time
 			stateChangedAt   *time.Time
@@ -65,6 +69,8 @@ func (c *ActivityCollector) GetDatabaseActivity(ctx context.Context) (*metrics.D
 			&clientAddress,
 			&state,
 			&queryText,
+			&waitEventType,
+			&waitEvent,
 			&backendStartedAt,
 			&queryStartedAt,
 			&stateChangedAt,
@@ -81,6 +87,8 @@ func (c *ActivityCollector) GetDatabaseActivity(ctx context.Context) (*metrics.D
 			ClientAddress:    stringValue(clientAddress),
 			State:            stringValue(state),
 			Query:            stringValue(queryText),
+			WaitEventType:    stringValue(waitEventType),
+			WaitEvent:        stringValue(waitEvent),
 			BackendStartedAt: backendStartedAt,
 			QueryStartedAt:   queryStartedAt,
 			StateChangedAt:   stateChangedAt,

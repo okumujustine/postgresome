@@ -60,7 +60,7 @@ func (r *Runner) Start(ctx context.Context) error {
 	defer ticker.Stop()
 
 	engine := analysis.NewEngine(rules.HighConnectionRule{}, rules.LowCacheHitRatioRule{}, rules.HighRollbackRateRule{})
-	engine.RegisterActivityRules(rules.IdleConnectionRule{}, rules.LongRunningQueryRule{})
+	engine.RegisterActivityRules(rules.IdleConnectionRule{}, rules.LongRunningQueryRule{}, rules.BlockedQueryRule{})
 
 	var previousStats *metrics.DatabaseStats
 
@@ -210,6 +210,12 @@ func printDatabaseActivity(snapshot *metrics.DatabaseActivitySnapshot) {
 		fmt.Println()
 		fmt.Println("State:")
 		fmt.Println(a.State)
+		fmt.Println()
+		fmt.Println("Wait Event Type:")
+		fmt.Println(a.WaitEventType)
+		fmt.Println()
+		fmt.Println("Wait Event:")
+		fmt.Println(a.WaitEvent)
 		fmt.Println()
 		fmt.Println("Query Duration:")
 		fmt.Println(formatQueryDuration(a.QueryStartedAt, snapshot.CollectedAt))

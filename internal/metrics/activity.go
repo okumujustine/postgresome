@@ -14,6 +14,9 @@ type DatabaseActivity struct {
 	State string
 	Query string
 
+	WaitEventType string
+	WaitEvent     string
+
 	BackendStartedAt time.Time
 	QueryStartedAt   *time.Time
 	StateChangedAt   *time.Time
