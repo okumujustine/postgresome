@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/okumujustine/postgresome/internal/analysis"
+	"github.com/okumujustine/postgresome/internal/analysis/rules"
 	"github.com/okumujustine/postgresome/internal/collector"
 	"github.com/okumujustine/postgresome/internal/metrics"
 )
@@ -48,6 +50,8 @@ func (r *Runner) Start(ctx context.Context) error {
 	ticker := time.NewTicker(r.interval)
 	defer ticker.Stop()
 
+	engine := analysis.NewEngine(rules.HighConnectionRule{}, rules.LowCacheHitRatioRule{}, rules.HighRollbackRateRule{})
+
 	var previousStats *metrics.DatabaseStats
 
 	for {
@@ -79,12 +83,21 @@ func (r *Runner) Start(ctx context.Context) error {
 			points := metrics.DatabaseStatsToMetricPoints(stats, collectedAt, dimensions)
 			printMetricPoints(points)
 
+			var delta metrics.DatabaseMetricDelta
+
 			if previousStats == nil {
 				fmt.Println("Waiting for next collection cycle to calculate metric changes")
+				delta = metrics.DatabaseMetricDelta{
+					CollectedAt:        collectedAt,
+					DatabaseInstanceID: stats.DatabaseName,
+				}
 			} else {
-				delta := metrics.CalculateDatabaseDelta(previousStats, stats, collectedAt, stats.DatabaseName)
+				delta = metrics.CalculateDatabaseDelta(previousStats, stats, collectedAt, stats.DatabaseName)
 				printDatabaseDelta(delta)
 			}
+
+			findings := engine.AnalyzeDatabaseMetrics(*stats, delta)
+			printFindings(findings)
 
 			previousStats = stats
 		}
@@ -126,6 +139,34 @@ func printDatabaseDelta(delta metrics.DatabaseMetricDelta) {
 	fmt.Printf("- Rows Updated Delta: %d\n", delta.RowsUpdatedDelta)
 	fmt.Printf("- Rows Deleted Delta: %d\n", delta.RowsDeletedDelta)
 	fmt.Println("--------------------------------")
+}
+
+func printFindings(findings []analysis.Finding) {
+	if len(findings) == 0 {
+		fmt.Println("No performance issues detected")
+		fmt.Println("--------------------------------")
+		return
+	}
+
+	for _, finding := range findings {
+		fmt.Println("Finding detected:")
+		fmt.Println()
+		fmt.Println("Severity:")
+		fmt.Println(finding.Severity)
+		fmt.Println()
+		fmt.Println("Category:")
+		fmt.Println(finding.Category)
+		fmt.Println()
+		fmt.Println("Title:")
+		fmt.Println(finding.Title)
+		fmt.Println()
+		fmt.Println("Message:")
+		fmt.Println(finding.Message)
+		fmt.Println()
+		fmt.Println("Recommendation:")
+		fmt.Println(finding.Recommendation)
+		fmt.Println("--------------------------------")
+	}
 }
 
 func printMetricPoints(points []metrics.MetricPoint) {
