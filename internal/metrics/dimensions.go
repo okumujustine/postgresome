@@ -6,3 +6,12 @@ type AgentDimension struct {
 	AgentVersion string
 	Environment  string
 }
+
+type DatabaseInstanceDimension struct {
+	DatabaseInstanceID string
+	AgentID            string
+	DatabaseName       string
+	Host               string
+	Port               int
+	PostgresVersion    string
+}
