@@ -3,13 +3,21 @@ package agent
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/okumujustine/postgresome/internal/analysis"
 	"github.com/okumujustine/postgresome/internal/analysis/rules"
 	"github.com/okumujustine/postgresome/internal/collector"
+	"github.com/okumujustine/postgresome/internal/collector/activity"
 	"github.com/okumujustine/postgresome/internal/metrics"
+)
+
+const (
+	maxSampleSessions     = 5
+	maxQueryPreviewLength = 80
 )
 
 type Runner struct {
@@ -36,6 +44,7 @@ func (r *Runner) Start(ctx context.Context) error {
 	}
 
 	postgresCollector := collector.NewPostgresCollector(pool)
+	activityCollector := activity.NewActivityCollector(pool)
 
 	info, err := postgresCollector.GetDatabaseInfo(ctx)
 	if err != nil {
@@ -51,6 +60,7 @@ func (r *Runner) Start(ctx context.Context) error {
 	defer ticker.Stop()
 
 	engine := analysis.NewEngine(rules.HighConnectionRule{}, rules.LowCacheHitRatioRule{}, rules.HighRollbackRateRule{})
+	engine.RegisterActivityRules(rules.IdleConnectionRule{}, rules.LongRunningQueryRule{})
 
 	var previousStats *metrics.DatabaseStats
 
@@ -71,6 +81,17 @@ func (r *Runner) Start(ctx context.Context) error {
 			}
 
 			printDatabaseStats(stats)
+
+			activityCtx, activityCancel := context.WithTimeout(ctx, 5*time.Second)
+			activitySnapshot, err := activityCollector.GetDatabaseActivity(activityCtx)
+			activityCancel()
+
+			if err != nil {
+				fmt.Printf("failed to collect database activity: %v\n", err)
+			} else {
+				activitySnapshot.DatabaseInstanceID = stats.DatabaseName
+				printDatabaseActivity(activitySnapshot)
+			}
 
 			collectedAt := time.Now()
 
@@ -97,6 +118,11 @@ func (r *Runner) Start(ctx context.Context) error {
 			}
 
 			findings := engine.AnalyzeDatabaseMetrics(*stats, delta)
+
+			if activitySnapshot != nil {
+				findings = append(findings, engine.AnalyzeDatabaseActivity(*activitySnapshot)...)
+			}
+
 			printFindings(findings)
 
 			previousStats = stats
@@ -139,6 +165,79 @@ func printDatabaseDelta(delta metrics.DatabaseMetricDelta) {
 	fmt.Printf("- Rows Updated Delta: %d\n", delta.RowsUpdatedDelta)
 	fmt.Printf("- Rows Deleted Delta: %d\n", delta.RowsDeletedDelta)
 	fmt.Println("--------------------------------")
+}
+
+func printDatabaseActivity(snapshot *metrics.DatabaseActivitySnapshot) {
+	fmt.Println("Database Activity:")
+	fmt.Println()
+	fmt.Printf("Total Sessions: %d\n", len(snapshot.Activities))
+	fmt.Println()
+
+	stateCounts := make(map[string]int)
+	for _, a := range snapshot.Activities {
+		state := a.State
+		if state == "" {
+			state = "background"
+		}
+		stateCounts[state]++
+	}
+
+	states := make([]string, 0, len(stateCounts))
+	for state := range stateCounts {
+		states = append(states, state)
+	}
+	sort.Strings(states)
+
+	fmt.Println("States:")
+	for _, state := range states {
+		fmt.Printf("%s: %d\n", state, stateCounts[state])
+	}
+	fmt.Println("--------------------------------")
+
+	for i, a := range snapshot.Activities {
+		if i >= maxSampleSessions {
+			break
+		}
+
+		fmt.Println("PID:")
+		fmt.Println(a.ProcessID)
+		fmt.Println()
+		fmt.Println("User:")
+		fmt.Println(a.UserName)
+		fmt.Println()
+		fmt.Println("Application:")
+		fmt.Println(a.ApplicationName)
+		fmt.Println()
+		fmt.Println("State:")
+		fmt.Println(a.State)
+		fmt.Println()
+		fmt.Println("Query Duration:")
+		fmt.Println(formatQueryDuration(a.QueryStartedAt, snapshot.CollectedAt))
+		fmt.Println()
+		fmt.Println("Query:")
+		fmt.Println(previewQuery(a.Query, maxQueryPreviewLength))
+		fmt.Println("--------------------------------")
+	}
+}
+
+func formatQueryDuration(queryStartedAt *time.Time, collectedAt time.Time) string {
+	if queryStartedAt == nil {
+		return "n/a"
+	}
+
+	duration := max(collectedAt.Sub(*queryStartedAt), 0)
+
+	return fmt.Sprintf("%.0f seconds", duration.Seconds())
+}
+
+func previewQuery(query string, maxLength int) string {
+	query = strings.Join(strings.Fields(query), " ")
+
+	if len(query) <= maxLength {
+		return query
+	}
+
+	return query[:maxLength] + "..."
 }
 
 func printFindings(findings []analysis.Finding) {

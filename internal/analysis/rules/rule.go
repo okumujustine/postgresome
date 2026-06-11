@@ -18,3 +18,11 @@ type Rule interface {
 	Name() string
 	Analyze(stats metrics.DatabaseStats, delta metrics.DatabaseMetricDelta) []analysis.Finding
 }
+
+// ActivityRule inspects a snapshot of pg_stat_activity sessions and reports
+// zero or more findings. Implementations satisfy analysis.ActivityRule and
+// can be registered with an analysis.Engine via RegisterActivityRules.
+type ActivityRule interface {
+	Name() string
+	Analyze(snapshot metrics.DatabaseActivitySnapshot) []analysis.Finding
+}
