@@ -6,14 +6,19 @@ type DatabaseInfo struct {
 
 type DatabaseStats struct {
 	DatabaseName string
-	NumBackends  int
-	XactCommit   int64
-	XactRollback int64
-	BlksRead     int64
-	BlksHit      int64
-	TupReturned  int64
-	TupFetched   int64
-	TupInserted  int64
-	TupUpdated   int64
-	TupDeleted   int64
+
+	ActiveConnections int
+
+	TransactionCommits   int64
+	TransactionRollbacks int64
+
+	BlocksReadFromDisk int64
+	BlocksHitInCache   int64
+
+	RowsScanned int64
+	RowsFetched int64
+
+	RowsInserted int64
+	RowsUpdated  int64
+	RowsDeleted  int64
 }

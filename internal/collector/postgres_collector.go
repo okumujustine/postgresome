@@ -52,16 +52,16 @@ func (c *PostgresCollector) GetDatabaseStats(ctx context.Context) (*model.Databa
 
 	err := c.pool.QueryRow(ctx, query).Scan(
 		&stats.DatabaseName,
-		&stats.NumBackends,
-		&stats.XactCommit,
-		&stats.XactRollback,
-		&stats.BlksRead,
-		&stats.BlksHit,
-		&stats.TupReturned,
-		&stats.TupFetched,
-		&stats.TupInserted,
-		&stats.TupUpdated,
-		&stats.TupDeleted,
+		&stats.ActiveConnections,
+		&stats.TransactionCommits,
+		&stats.TransactionRollbacks,
+		&stats.BlocksReadFromDisk,
+		&stats.BlocksHitInCache,
+		&stats.RowsScanned,
+		&stats.RowsFetched,
+		&stats.RowsInserted,
+		&stats.RowsUpdated,
+		&stats.RowsDeleted,
 	)
 	if err != nil {
 		return nil, err
