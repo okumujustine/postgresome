@@ -108,22 +108,23 @@ func printDatabaseStats(stats *metrics.DatabaseStats) {
 
 func printDatabaseDelta(delta metrics.DatabaseMetricDelta) {
 	fmt.Println("Transactions since last collection:")
-	fmt.Printf("+%d commits\n", delta.TransactionCommitsDelta)
-	fmt.Printf("+%d rollbacks\n", delta.TransactionRollbacksDelta)
+	fmt.Printf("- Commits Delta: %d\n", delta.TransactionCommitsDelta)
+	fmt.Printf("- Rollbacks Delta: %d\n", delta.TransactionRollbacksDelta)
+	fmt.Printf("- Rollback Rate: %.1f%%\n", delta.RollbackRate*100)
 	fmt.Println()
 
-	fmt.Println("Rows changed:")
-	fmt.Printf("+%d inserted\n", delta.RowsInsertedDelta)
-	fmt.Printf("+%d updated\n", delta.RowsUpdatedDelta)
-	fmt.Printf("+%d deleted\n", delta.RowsDeletedDelta)
+	fmt.Println("Cache since last collection:")
+	fmt.Printf("- Blocks Read From Disk Delta: %d\n", delta.BlocksReadFromDiskDelta)
+	fmt.Printf("- Blocks Hit In Cache Delta: %d\n", delta.BlocksHitInCacheDelta)
+	fmt.Printf("- Cache Hit Ratio: %.1f%%\n", delta.CacheHitRatio*100)
 	fmt.Println()
 
-	fmt.Println("Cache:")
-	fmt.Printf("%.1f%% hit ratio\n", delta.CacheHitRatio*100)
-	fmt.Println()
-
-	fmt.Println("Transaction Health:")
-	fmt.Printf("%.1f%% rollback rate\n", delta.RollbackRate*100)
+	fmt.Println("Rows since last collection:")
+	fmt.Printf("- Rows Scanned Delta: %d\n", delta.RowsScannedDelta)
+	fmt.Printf("- Rows Fetched Delta: %d\n", delta.RowsFetchedDelta)
+	fmt.Printf("- Rows Inserted Delta: %d\n", delta.RowsInsertedDelta)
+	fmt.Printf("- Rows Updated Delta: %d\n", delta.RowsUpdatedDelta)
+	fmt.Printf("- Rows Deleted Delta: %d\n", delta.RowsDeletedDelta)
 	fmt.Println("--------------------------------")
 }
 
