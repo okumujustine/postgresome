@@ -108,3 +108,47 @@ func QueryMetricPoints(ctx context.Context, pool *pgxpool.Pool, params MetricQue
 
 	return points, nil
 }
+
+const getMetricRangeStatsSQL = `
+	SELECT
+		COALESCE(avg(value), 0),
+		COALESCE((array_agg(value ORDER BY time ASC))[1], 0),
+		COALESCE((array_agg(value ORDER BY time DESC))[1], 0),
+		count(*)
+	FROM metric_points
+	WHERE metric_key = $1
+	  AND time >= $2
+	  AND time < $3
+	  AND ($4 = '' OR database_instance_id = $4)
+	  AND ($5 = '' OR agent_id = $5)
+`
+
+// MetricRangeStats summarizes a metric over a time range: the average value
+// (useful for gauges like active connections) and the first/last values
+// (useful for deriving deltas from cumulative counters).
+type MetricRangeStats struct {
+	Average float64
+	First   float64
+	Last    float64
+	HasData bool
+}
+
+// GetMetricRangeStats computes summary statistics for a metric over
+// [start, end), optionally filtered by database instance and/or agent.
+func GetMetricRangeStats(ctx context.Context, pool *pgxpool.Pool, metricKey, databaseInstanceID, agentID string, start, end time.Time) (MetricRangeStats, error) {
+	var (
+		stats      MetricRangeStats
+		pointCount int
+	)
+
+	err := pool.QueryRow(ctx, getMetricRangeStatsSQL, metricKey, start, end, databaseInstanceID, agentID).Scan(
+		&stats.Average, &stats.First, &stats.Last, &pointCount,
+	)
+	if err != nil {
+		return MetricRangeStats{}, fmt.Errorf("failed to get metric range stats for %q: %w", metricKey, err)
+	}
+
+	stats.HasData = pointCount > 0
+
+	return stats, nil
+}

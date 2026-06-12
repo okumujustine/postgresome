@@ -1,0 +1,137 @@
+# The actual Postgresome application stack: its own storage, API, agents,
+# and frontend. Started with `make docker-up`.
+#
+# Joins the "postgresome" network created by docker-compose.yml so the
+# agents here can reach the "monitored" postgres-primary / postgres-secondary
+# instances by service name.
+
+name: postgresome-app
+
+networks:
+  default:
+    name: postgresome
+    external: true
+
+
+services:
+  postgresome-db:
+    image: timescale/timescaledb:latest-pg16
+    container_name: postgresome-app-db
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgresome_app
+
+    ports:
+      - "55434:5432"
+
+    volumes:
+      - postgresome_app_data:/var/lib/postgresql/data
+
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=timescaledb
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/migrate/Dockerfile
+    container_name: postgresome-migrate
+
+    environment:
+      POSTGRESOME_DATABASE_URL: postgres://postgres:postgres@postgresome-db:5432/postgresome_app?sslmode=disable
+
+    depends_on:
+      postgresome-db:
+        condition: service_healthy
+
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    container_name: postgresome-api
+    restart: unless-stopped
+
+    environment:
+      API_ADDR: ":9090"
+      POSTGRESOME_DATABASE_URL: postgres://postgres:postgres@postgresome-db:5432/postgresome_app?sslmode=disable
+
+    ports:
+      - "9090:9090"
+
+    depends_on:
+      postgresome-db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+
+  agent-primary:
+    build:
+      context: .
+      dockerfile: docker/agent/Dockerfile
+    container_name: postgresome-agent-primary
+    restart: unless-stopped
+
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres-primary:5432/postgresome_test?sslmode=disable
+      AGENT_ID: agent-primary
+      AGENT_NAME: Primary Agent
+      AGENT_ENVIRONMENT: docker
+      POSTGRESOME_API_URL: http://api:9090
+      DATABASE_INSTANCE_ID: db-primary
+
+    depends_on:
+      api:
+        condition: service_started
+
+
+  agent-secondary:
+    build:
+      context: .
+      dockerfile: docker/agent/Dockerfile
+    container_name: postgresome-agent-secondary
+    restart: unless-stopped
+
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres-secondary:5432/postgresome_secondary?sslmode=disable
+      AGENT_ID: agent-secondary
+      AGENT_NAME: Secondary Agent
+      AGENT_ENVIRONMENT: docker
+      POSTGRESOME_API_URL: http://api:9090
+      DATABASE_INSTANCE_ID: db-secondary
+
+    depends_on:
+      api:
+        condition: service_started
+
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:9090
+    container_name: postgresome-frontend
+    restart: unless-stopped
+
+    ports:
+      - "5173:80"
+
+    depends_on:
+      - api
+
+
+volumes:
+  postgresome_app_data:

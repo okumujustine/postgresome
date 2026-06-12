@@ -36,6 +36,12 @@ run-api:
 	POSTGRESOME_DATABASE_URL="$(POSTGRESOME_DB_URL)" go run ./cmd/api
 
 
+.PHONY: run-frontend
+run-frontend:
+	@echo "Starting frontend dev server..."
+	cd frontend && npm run dev
+
+
 .PHONY: migrate
 migrate:
 	@echo "Running database migrations..."
@@ -56,6 +62,26 @@ postgres-down:
 postgres-reset:
 	docker compose down -v
 	docker compose up -d
+
+
+.PHONY: docker-build
+docker-build:
+	docker compose -f docker-compose.app.yml build
+
+
+.PHONY: docker-up
+docker-up: postgres-up
+	docker compose -f docker-compose.app.yml up -d --build
+
+
+.PHONY: docker-down
+docker-down:
+	docker compose -f docker-compose.app.yml down
+
+
+.PHONY: docker-logs
+docker-logs:
+	docker compose -f docker-compose.app.yml logs -f
 
 
 .PHONY: tidy
