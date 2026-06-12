@@ -10,11 +10,11 @@ POSTGRESOME_API_URL=http://localhost:9090
 run-agent-primary:
 	@echo "Starting agent against PRIMARY database..."
 	DATABASE_URL="$(PRIMARY_DB_URL)" \
-	AGENT_ID="agent-primary" \
-	AGENT_NAME="Primary Agent" \
+	AGENT_ID="agent-local-primary" \
+	AGENT_NAME="Local Primary Agent" \
 	AGENT_ENVIRONMENT="development" \
 	POSTGRESOME_API_URL="$(POSTGRESOME_API_URL)" \
-	DATABASE_INSTANCE_ID="db-primary" \
+	DATABASE_INSTANCE_ID="db-local-primary" \
 	go run ./cmd/agent
 
 
@@ -22,11 +22,11 @@ run-agent-primary:
 run-agent-secondary:
 	@echo "Starting agent against SECONDARY database..."
 	DATABASE_URL="$(SECONDARY_DB_URL)" \
-	AGENT_ID="agent-secondary" \
-	AGENT_NAME="Secondary Agent" \
+	AGENT_ID="agent-local-secondary" \
+	AGENT_NAME="Local Secondary Agent" \
 	AGENT_ENVIRONMENT="development" \
 	POSTGRESOME_API_URL="$(POSTGRESOME_API_URL)" \
-	DATABASE_INSTANCE_ID="db-secondary" \
+	DATABASE_INSTANCE_ID="db-local-secondary" \
 	go run ./cmd/agent
 
 

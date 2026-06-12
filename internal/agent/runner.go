@@ -34,15 +34,18 @@ type Config struct {
 	AgentEnvironment   string
 	APIBaseURL         string
 	DatabaseInstanceID string
+	LogLevel           string
 }
 
 type Runner struct {
-	cfg Config
+	cfg      Config
+	logLevel logLevel
 }
 
 func NewRunner(cfg Config) *Runner {
 	return &Runner{
-		cfg: cfg,
+		cfg:      cfg,
+		logLevel: parseLogLevel(cfg.LogLevel),
 	}
 }
 
@@ -68,12 +71,11 @@ func (r *Runner) Start(ctx context.Context) error {
 		return err
 	}
 
-	fmt.Println("Connected to PostgreSQL successfully")
-	fmt.Println("Database version:")
-	fmt.Println(info.Version)
-	fmt.Println()
+	fmt.Printf("Connected to PostgreSQL successfully (version: %s)\n", info.Version)
 
-	if err := r.registerWithAPI(ctx, pool, info.Version); err != nil {
+	apiClient := client.NewAgentAPIClient(r.cfg.APIBaseURL)
+
+	if err := r.registerWithAPI(ctx, pool, apiClient, info.Version); err != nil {
 		return err
 	}
 
@@ -85,12 +87,14 @@ func (r *Runner) Start(ctx context.Context) error {
 	} else {
 		fmt.Println("pg_stat_statements not enabled - skipping query analysis")
 	}
-	fmt.Println()
+
+	fmt.Printf("Collection interval: %s\n", r.cfg.Interval)
 
 	ticker := time.NewTicker(r.cfg.Interval)
 	defer ticker.Stop()
 
-	engine := analysis.NewEngine(rules.HighConnectionRule{}, rules.LowCacheHitRatioRule{}, rules.HighRollbackRateRule{})
+	engine := analysis.NewEngine()
+	engine.RegisterMetricRules(rules.HighConnectionRule{}, rules.LowCacheHitRatioRule{}, rules.HighRollbackRateRule{})
 	engine.RegisterActivityRules(rules.IdleConnectionRule{}, rules.LongRunningQueryRule{}, rules.BlockedQueryRule{})
 	engine.RegisterTableRules(rules.AutovacuumLagRule{}, rules.HighSequentialScanRule{})
 	engine.RegisterQueryRules(rules.SlowQueryRule{}, rules.ExpensiveQueryRule{}, rules.DiskHeavyQueryRule{})
@@ -113,7 +117,9 @@ func (r *Runner) Start(ctx context.Context) error {
 				continue
 			}
 
-			printDatabaseStats(stats)
+			if r.logLevel == logLevelDebug {
+				printDatabaseStats(stats)
+			}
 
 			activityCtx, activityCancel := context.WithTimeout(ctx, 5*time.Second)
 			activitySnapshot, err := activityCollector.GetDatabaseActivity(activityCtx)
@@ -123,7 +129,9 @@ func (r *Runner) Start(ctx context.Context) error {
 				fmt.Printf("failed to collect database activity: %v\n", err)
 			} else {
 				activitySnapshot.DatabaseInstanceID = stats.DatabaseName
-				printDatabaseActivity(activitySnapshot)
+				if r.logLevel == logLevelDebug {
+					printDatabaseActivity(activitySnapshot)
+				}
 			}
 
 			tableStatsCtx, tableStatsCancel := context.WithTimeout(ctx, 5*time.Second)
@@ -134,7 +142,9 @@ func (r *Runner) Start(ctx context.Context) error {
 				fmt.Printf("failed to collect table stats: %v\n", err)
 			} else {
 				tableStatsSnapshot.DatabaseInstanceID = stats.DatabaseName
-				printTableHealthSummary(tableStatsSnapshot)
+				if r.logLevel == logLevelDebug {
+					printTableHealthSummary(tableStatsSnapshot)
+				}
 			}
 
 			var queryStatsSnapshot *metrics.QueryStatsSnapshot
@@ -148,7 +158,9 @@ func (r *Runner) Start(ctx context.Context) error {
 					fmt.Printf("failed to collect query stats: %v\n", err)
 				} else {
 					snapshot.DatabaseInstanceID = stats.DatabaseName
-					printQueryPerformanceSummary(snapshot)
+					if r.logLevel == logLevelDebug {
+						printQueryPerformanceSummary(snapshot)
+					}
 					queryStatsSnapshot = snapshot
 				}
 			}
@@ -156,25 +168,41 @@ func (r *Runner) Start(ctx context.Context) error {
 			collectedAt := time.Now()
 
 			dimensions := map[string]string{
-				"database_name": stats.DatabaseName,
-				"agent_id":      "local-agent",
-				"environment":   "development",
+				"agent_id":             r.cfg.AgentID,
+				"database_instance_id": r.cfg.DatabaseInstanceID,
+				"environment":          r.cfg.AgentEnvironment,
+				"database_name":        stats.DatabaseName,
 			}
 
 			points := metrics.DatabaseStatsToMetricPoints(stats, collectedAt, dimensions)
-			printMetricPoints(points)
+
+			if r.logLevel == logLevelDebug {
+				printMetricPoints(points)
+			}
+
+			sendMetricsCtx, sendMetricsCancel := context.WithTimeout(ctx, 5*time.Second)
+			_, err = apiClient.SendMetrics(sendMetricsCtx, r.cfg.AgentID, r.cfg.DatabaseInstanceID, points)
+			sendMetricsCancel()
+
+			metricsSent := 0
+			if err != nil {
+				fmt.Printf("failed to send metrics to API: %v\n", err)
+			} else {
+				metricsSent = len(points)
+			}
 
 			var delta metrics.DatabaseMetricDelta
 
 			if previousStats == nil {
-				fmt.Println("Waiting for next collection cycle to calculate metric changes")
 				delta = metrics.DatabaseMetricDelta{
 					CollectedAt:        collectedAt,
 					DatabaseInstanceID: stats.DatabaseName,
 				}
 			} else {
 				delta = metrics.CalculateDatabaseDelta(previousStats, stats, collectedAt, stats.DatabaseName)
-				printDatabaseDelta(delta)
+				if r.logLevel == logLevelDebug {
+					printDatabaseDelta(delta)
+				}
 			}
 
 			findings := engine.AnalyzeDatabaseMetrics(*stats, delta)
@@ -191,7 +219,54 @@ func (r *Runner) Start(ctx context.Context) error {
 				findings = append(findings, engine.AnalyzeQueryStats(*queryStatsSnapshot)...)
 			}
 
-			printFindings(findings)
+			for i := range findings {
+				findings[i].AgentID = r.cfg.AgentID
+				findings[i].DatabaseInstanceID = r.cfg.DatabaseInstanceID
+			}
+
+			sendFindingsCtx, sendFindingsCancel := context.WithTimeout(ctx, 5*time.Second)
+			_, err = apiClient.SendFindings(sendFindingsCtx, r.cfg.AgentID, r.cfg.DatabaseInstanceID, findings)
+			sendFindingsCancel()
+
+			findingsSent := 0
+			if err != nil {
+				fmt.Printf("failed to send findings to API: %v\n", err)
+			} else {
+				findingsSent = len(findings)
+			}
+
+			activitySessions := 0
+			if activitySnapshot != nil {
+				activitySessions = len(activitySnapshot.Activities)
+			}
+
+			tablesAnalyzed := 0
+			if tableStatsSnapshot != nil {
+				tablesAnalyzed = len(tableStatsSnapshot.Tables)
+			}
+
+			queriesAnalyzed := 0
+			if queryStatsSnapshot != nil {
+				queriesAnalyzed = len(queryStatsSnapshot.Queries)
+			}
+
+			printCollectionSummary(collectionSummary{
+				DatabaseName:        stats.DatabaseName,
+				MetricsSent:         metricsSent,
+				FindingsSent:        findingsSent,
+				ActivitySessions:    activitySessions,
+				TablesAnalyzed:      tablesAnalyzed,
+				QueriesAnalyzed:     queriesAnalyzed,
+				QueryAnalysisActive: pgStatStatementsEnabled,
+			})
+
+			if len(findings) > 0 {
+				printFindingsSummary(findings)
+
+				if r.logLevel == logLevelDebug {
+					printFindingsDetail(findings)
+				}
+			}
 
 			previousStats = stats
 		}
@@ -200,7 +275,7 @@ func (r *Runner) Start(ctx context.Context) error {
 
 // registerWithAPI discovers the monitored database's name and host, then
 // registers the agent and database instance with the Postgresome API.
-func (r *Runner) registerWithAPI(ctx context.Context, pool *pgxpool.Pool, postgresVersion string) error {
+func (r *Runner) registerWithAPI(ctx context.Context, pool *pgxpool.Pool, apiClient *client.AgentAPIClient, postgresVersion string) error {
 	var databaseName string
 
 	if err := pool.QueryRow(ctx, "SELECT current_database()").Scan(&databaseName); err != nil {
@@ -208,8 +283,6 @@ func (r *Runner) registerWithAPI(ctx context.Context, pool *pgxpool.Pool, postgr
 	}
 
 	host := databaseHost(r.cfg.DatabaseURL)
-
-	apiClient := client.NewAgentAPIClient(r.cfg.APIBaseURL)
 
 	_, err := apiClient.RegisterAgent(ctx, client.RegisterAgentRequest{
 		Agent: client.AgentInfo{
@@ -229,7 +302,6 @@ func (r *Runner) registerWithAPI(ctx context.Context, pool *pgxpool.Pool, postgr
 	}
 
 	fmt.Println("Agent registered successfully")
-	fmt.Println()
 
 	return nil
 }
@@ -360,13 +432,41 @@ func previewQuery(query string, maxLength int) string {
 	return query[:maxLength] + "..."
 }
 
-func printFindings(findings []analysis.Finding) {
-	if len(findings) == 0 {
-		fmt.Println("No performance issues detected")
-		fmt.Println("--------------------------------")
-		return
-	}
+// collectionSummary holds the counts reported at the end of a collection
+// cycle.
+type collectionSummary struct {
+	DatabaseName        string
+	MetricsSent         int
+	FindingsSent        int
+	ActivitySessions    int
+	TablesAnalyzed      int
+	QueriesAnalyzed     int
+	QueryAnalysisActive bool
+}
 
+func printCollectionSummary(s collectionSummary) {
+	fmt.Println("Collection completed:")
+	fmt.Printf("- Database: %s\n", s.DatabaseName)
+	fmt.Printf("- Metrics sent: %d\n", s.MetricsSent)
+	fmt.Printf("- Findings sent: %d\n", s.FindingsSent)
+	fmt.Printf("- Activity sessions: %d\n", s.ActivitySessions)
+	fmt.Printf("- Tables analyzed: %d\n", s.TablesAnalyzed)
+	if s.QueryAnalysisActive {
+		fmt.Printf("- Queries analyzed: %d\n", s.QueriesAnalyzed)
+	}
+}
+
+// printFindingsSummary prints a one-line summary per finding: severity,
+// category, and title.
+func printFindingsSummary(findings []analysis.Finding) {
+	for _, finding := range findings {
+		fmt.Printf("- [%s] %s: %s\n", finding.Severity, finding.Category, finding.Title)
+	}
+}
+
+// printFindingsDetail prints the full message and recommendation for each
+// finding. Only called in debug mode.
+func printFindingsDetail(findings []analysis.Finding) {
 	for _, finding := range findings {
 		fmt.Println("Finding detected:")
 		fmt.Println()

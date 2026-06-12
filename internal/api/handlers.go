@@ -3,8 +3,12 @@ package api
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
+	"github.com/okumujustine/postgresome/internal/analysis"
+	"github.com/okumujustine/postgresome/internal/metrics"
 	"github.com/okumujustine/postgresome/internal/storage"
+	"github.com/okumujustine/postgresome/internal/storage/repository"
 )
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +64,133 @@ func (s *Server) handleRegisterAgent(w http.ResponseWriter, r *http.Request) {
 		"agent_id":             req.Agent.ID,
 		"database_instance_id": req.Database.ID,
 		"status":               "registered",
+	})
+}
+
+type ingestMetricsRequest struct {
+	AgentID            string              `json:"agent_id"`
+	DatabaseInstanceID string              `json:"database_instance_id"`
+	Metrics            []ingestMetricPoint `json:"metrics"`
+}
+
+type ingestMetricPoint struct {
+	Key         string            `json:"key"`
+	Label       string            `json:"label"`
+	Value       float64           `json:"value"`
+	Unit        string            `json:"unit"`
+	Category    string            `json:"category"`
+	CollectedAt time.Time         `json:"collected_at"`
+	Dimensions  map[string]string `json:"dimensions"`
+}
+
+func (s *Server) handleIngestMetrics(w http.ResponseWriter, r *http.Request) {
+	var req ingestMetricsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.AgentID == "" || req.DatabaseInstanceID == "" || len(req.Metrics) == 0 {
+		http.Error(w, "agent_id, database_instance_id, and metrics are required", http.StatusBadRequest)
+		return
+	}
+
+	points := make([]metrics.MetricPoint, len(req.Metrics))
+
+	for i, m := range req.Metrics {
+		dimensions := m.Dimensions
+		if dimensions == nil {
+			dimensions = make(map[string]string)
+		}
+
+		if _, ok := dimensions["agent_id"]; !ok {
+			dimensions["agent_id"] = req.AgentID
+		}
+
+		if _, ok := dimensions["database_instance_id"]; !ok {
+			dimensions["database_instance_id"] = req.DatabaseInstanceID
+		}
+
+		points[i] = metrics.MetricPoint{
+			Key:         m.Key,
+			Label:       m.Label,
+			Value:       m.Value,
+			Unit:        m.Unit,
+			Category:    m.Category,
+			CollectedAt: m.CollectedAt,
+			Dimensions:  dimensions,
+		}
+	}
+
+	if err := repository.InsertMetricPoints(r.Context(), s.pool, points); err != nil {
+		http.Error(w, "failed to store metrics", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":   "accepted",
+		"inserted": len(points),
+	})
+}
+
+type ingestFindingsRequest struct {
+	AgentID            string              `json:"agent_id"`
+	DatabaseInstanceID string              `json:"database_instance_id"`
+	Findings           []ingestFindingItem `json:"findings"`
+}
+
+type ingestFindingItem struct {
+	Severity       string `json:"severity"`
+	Category       string `json:"category"`
+	Title          string `json:"title"`
+	Message        string `json:"message"`
+	Recommendation string `json:"recommendation"`
+}
+
+func (s *Server) handleIngestFindings(w http.ResponseWriter, r *http.Request) {
+	var req ingestFindingsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.AgentID == "" || req.DatabaseInstanceID == "" {
+		http.Error(w, "agent_id and database_instance_id are required", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.Findings) == 0 {
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":   "accepted",
+			"inserted": 0,
+		})
+		return
+	}
+
+	detectedAt := time.Now()
+
+	findings := make([]analysis.Finding, len(req.Findings))
+	for i, f := range req.Findings {
+		findings[i] = analysis.Finding{
+			DetectedAt:         detectedAt,
+			DatabaseInstanceID: req.DatabaseInstanceID,
+			AgentID:            req.AgentID,
+			Severity:           f.Severity,
+			Category:           f.Category,
+			Title:              f.Title,
+			Message:            f.Message,
+			Recommendation:     f.Recommendation,
+		}
+	}
+
+	if err := repository.InsertFindings(r.Context(), s.pool, findings); err != nil {
+		http.Error(w, "failed to store findings", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":   "accepted",
+		"inserted": len(findings),
 	})
 }
 

@@ -42,6 +42,8 @@ func main() {
 		log.Fatal("DATABASE_INSTANCE_ID environment variable is required")
 	}
 
+	logLevel := os.Getenv("LOG_LEVEL")
+
 	ctx, stop := signal.NotifyContext(
 		context.Background(),
 		os.Interrupt,
@@ -57,6 +59,7 @@ func main() {
 		AgentEnvironment:   agentEnvironment,
 		APIBaseURL:         apiBaseURL,
 		DatabaseInstanceID: databaseInstanceID,
+		LogLevel:           logLevel,
 	})
 
 	log.Println("starting Postgresome agent")

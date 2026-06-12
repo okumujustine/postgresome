@@ -8,6 +8,7 @@ type Finding struct {
 	DetectedAt time.Time
 
 	DatabaseInstanceID string
+	AgentID            string
 
 	Severity string
 	Category string
