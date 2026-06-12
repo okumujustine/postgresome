@@ -1,0 +1,71 @@
+package api
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+const shutdownTimeout = 5 * time.Second
+
+// Server is the Postgresome HTTP API server. It runs independently of the
+// agent and will eventually serve collected metrics and findings to a
+// frontend dashboard.
+type Server struct {
+	addr       string
+	pool       *pgxpool.Pool
+	httpServer *http.Server
+}
+
+func NewServer(addr string, pool *pgxpool.Pool) *Server {
+	s := &Server{
+		addr: addr,
+		pool: pool,
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", handleHealth)
+	mux.HandleFunc("GET /version", handleVersion)
+	mux.HandleFunc("POST /api/agents/register", s.handleRegisterAgent)
+
+	s.httpServer = &http.Server{
+		Addr:    addr,
+		Handler: mux,
+	}
+
+	return s
+}
+
+// Start runs the HTTP server until ctx is cancelled, then shuts it down
+// gracefully.
+func (s *Server) Start(ctx context.Context) error {
+	errCh := make(chan error, 1)
+
+	go func() {
+		if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+			return
+		}
+
+		errCh <- nil
+	}()
+
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+
+		if err := s.httpServer.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("failed to shut down API server: %w", err)
+		}
+
+		return ctx.Err()
+
+	case err := <-errCh:
+		return err
+	}
+}

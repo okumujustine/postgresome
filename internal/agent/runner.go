@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/okumujustine/postgresome/internal/agent/client"
 	"github.com/okumujustine/postgresome/internal/analysis"
 	"github.com/okumujustine/postgresome/internal/analysis/rules"
 	"github.com/okumujustine/postgresome/internal/collector"
@@ -25,20 +26,28 @@ const (
 	maxQuerySummaryItems  = 5
 )
 
-type Runner struct {
-	databaseURL string
-	interval    time.Duration
+type Config struct {
+	DatabaseURL        string
+	Interval           time.Duration
+	AgentID            string
+	AgentName          string
+	AgentEnvironment   string
+	APIBaseURL         string
+	DatabaseInstanceID string
 }
 
-func NewRunner(databaseURL string, interval time.Duration) *Runner {
+type Runner struct {
+	cfg Config
+}
+
+func NewRunner(cfg Config) *Runner {
 	return &Runner{
-		databaseURL: databaseURL,
-		interval:    interval,
+		cfg: cfg,
 	}
 }
 
 func (r *Runner) Start(ctx context.Context) error {
-	pool, err := pgxpool.New(ctx, r.databaseURL)
+	pool, err := pgxpool.New(ctx, r.cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
@@ -64,6 +73,10 @@ func (r *Runner) Start(ctx context.Context) error {
 	fmt.Println(info.Version)
 	fmt.Println()
 
+	if err := r.registerWithAPI(ctx, pool, info.Version); err != nil {
+		return err
+	}
+
 	pgStatStatementsEnabled, err := extensionCollector.IsPgStatStatementsEnabled(ctx)
 	if err != nil {
 		fmt.Printf("failed to check pg_stat_statements availability: %v\n", err)
@@ -74,7 +87,7 @@ func (r *Runner) Start(ctx context.Context) error {
 	}
 	fmt.Println()
 
-	ticker := time.NewTicker(r.interval)
+	ticker := time.NewTicker(r.cfg.Interval)
 	defer ticker.Stop()
 
 	engine := analysis.NewEngine(rules.HighConnectionRule{}, rules.LowCacheHitRatioRule{}, rules.HighRollbackRateRule{})
@@ -183,6 +196,52 @@ func (r *Runner) Start(ctx context.Context) error {
 			previousStats = stats
 		}
 	}
+}
+
+// registerWithAPI discovers the monitored database's name and host, then
+// registers the agent and database instance with the Postgresome API.
+func (r *Runner) registerWithAPI(ctx context.Context, pool *pgxpool.Pool, postgresVersion string) error {
+	var databaseName string
+
+	if err := pool.QueryRow(ctx, "SELECT current_database()").Scan(&databaseName); err != nil {
+		return fmt.Errorf("failed to discover database name: %w", err)
+	}
+
+	host := databaseHost(r.cfg.DatabaseURL)
+
+	apiClient := client.NewAgentAPIClient(r.cfg.APIBaseURL)
+
+	_, err := apiClient.RegisterAgent(ctx, client.RegisterAgentRequest{
+		Agent: client.AgentInfo{
+			ID:          r.cfg.AgentID,
+			Name:        r.cfg.AgentName,
+			Environment: r.cfg.AgentEnvironment,
+		},
+		Database: client.DatabaseInfo{
+			ID:      r.cfg.DatabaseInstanceID,
+			Name:    databaseName,
+			Host:    host,
+			Version: postgresVersion,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("agent registration failed: %w", err)
+	}
+
+	fmt.Println("Agent registered successfully")
+	fmt.Println()
+
+	return nil
+}
+
+// databaseHost extracts the host from a Postgres connection string.
+func databaseHost(databaseURL string) string {
+	config, err := pgxpool.ParseConfig(databaseURL)
+	if err != nil {
+		return ""
+	}
+
+	return config.ConnConfig.Host
 }
 
 func printDatabaseStats(stats *metrics.DatabaseStats) {
