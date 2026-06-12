@@ -26,11 +26,20 @@ type TableRule interface {
 	Analyze(snapshot metrics.TableStatsSnapshot) []Finding
 }
 
+// QueryRule inspects a snapshot of pg_stat_statements statistics and
+// reports zero or more findings. Concrete rules are implemented in
+// internal/analysis/rules and satisfy this interface structurally.
+type QueryRule interface {
+	Name() string
+	Analyze(snapshot metrics.QueryStatsSnapshot) []Finding
+}
+
 // Engine runs a set of rules against collected metrics to produce findings.
 type Engine struct {
 	rules         []Rule
 	activityRules []ActivityRule
 	tableRules    []TableRule
+	queryRules    []QueryRule
 }
 
 func NewEngine(rules ...Rule) *Engine {
@@ -75,6 +84,23 @@ func (e *Engine) AnalyzeTableStats(snapshot metrics.TableStatsSnapshot) []Findin
 	findings := make([]Finding, 0)
 
 	for _, rule := range e.tableRules {
+		findings = append(findings, rule.Analyze(snapshot)...)
+	}
+
+	return findings
+}
+
+// RegisterQueryRules adds rules that analyze pg_stat_statements snapshots.
+func (e *Engine) RegisterQueryRules(queryRules ...QueryRule) {
+	e.queryRules = append(e.queryRules, queryRules...)
+}
+
+// AnalyzeQueryStats runs all registered query rules against a
+// pg_stat_statements snapshot.
+func (e *Engine) AnalyzeQueryStats(snapshot metrics.QueryStatsSnapshot) []Finding {
+	findings := make([]Finding, 0)
+
+	for _, rule := range e.queryRules {
 		findings = append(findings, rule.Analyze(snapshot)...)
 	}
 

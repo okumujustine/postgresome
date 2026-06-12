@@ -12,6 +12,8 @@ import (
 	"github.com/okumujustine/postgresome/internal/analysis/rules"
 	"github.com/okumujustine/postgresome/internal/collector"
 	"github.com/okumujustine/postgresome/internal/collector/activity"
+	"github.com/okumujustine/postgresome/internal/collector/extensions"
+	"github.com/okumujustine/postgresome/internal/collector/queries"
 	"github.com/okumujustine/postgresome/internal/collector/tables"
 	"github.com/okumujustine/postgresome/internal/metrics"
 )
@@ -20,6 +22,7 @@ const (
 	maxSampleSessions     = 5
 	maxQueryPreviewLength = 80
 	maxTableSummaryItems  = 5
+	maxQuerySummaryItems  = 5
 )
 
 type Runner struct {
@@ -48,6 +51,8 @@ func (r *Runner) Start(ctx context.Context) error {
 	postgresCollector := collector.NewPostgresCollector(pool)
 	activityCollector := activity.NewActivityCollector(pool)
 	tableStatsCollector := tables.NewTableStatsCollector(pool)
+	extensionCollector := extensions.NewExtensionCollector(pool)
+	queryStatsCollector := queries.NewQueryStatsCollector(pool)
 
 	info, err := postgresCollector.GetDatabaseInfo(ctx)
 	if err != nil {
@@ -59,12 +64,23 @@ func (r *Runner) Start(ctx context.Context) error {
 	fmt.Println(info.Version)
 	fmt.Println()
 
+	pgStatStatementsEnabled, err := extensionCollector.IsPgStatStatementsEnabled(ctx)
+	if err != nil {
+		fmt.Printf("failed to check pg_stat_statements availability: %v\n", err)
+	} else if pgStatStatementsEnabled {
+		fmt.Println("pg_stat_statements enabled - query analysis available")
+	} else {
+		fmt.Println("pg_stat_statements not enabled - skipping query analysis")
+	}
+	fmt.Println()
+
 	ticker := time.NewTicker(r.interval)
 	defer ticker.Stop()
 
 	engine := analysis.NewEngine(rules.HighConnectionRule{}, rules.LowCacheHitRatioRule{}, rules.HighRollbackRateRule{})
 	engine.RegisterActivityRules(rules.IdleConnectionRule{}, rules.LongRunningQueryRule{}, rules.BlockedQueryRule{})
 	engine.RegisterTableRules(rules.AutovacuumLagRule{}, rules.HighSequentialScanRule{})
+	engine.RegisterQueryRules(rules.SlowQueryRule{}, rules.ExpensiveQueryRule{}, rules.DiskHeavyQueryRule{})
 
 	var previousStats *metrics.DatabaseStats
 
@@ -108,6 +124,22 @@ func (r *Runner) Start(ctx context.Context) error {
 				printTableHealthSummary(tableStatsSnapshot)
 			}
 
+			var queryStatsSnapshot *metrics.QueryStatsSnapshot
+
+			if pgStatStatementsEnabled {
+				queryStatsCtx, queryStatsCancel := context.WithTimeout(ctx, 5*time.Second)
+				snapshot, err := queryStatsCollector.GetQueryStats(queryStatsCtx)
+				queryStatsCancel()
+
+				if err != nil {
+					fmt.Printf("failed to collect query stats: %v\n", err)
+				} else {
+					snapshot.DatabaseInstanceID = stats.DatabaseName
+					printQueryPerformanceSummary(snapshot)
+					queryStatsSnapshot = snapshot
+				}
+			}
+
 			collectedAt := time.Now()
 
 			dimensions := map[string]string{
@@ -140,6 +172,10 @@ func (r *Runner) Start(ctx context.Context) error {
 
 			if tableStatsSnapshot != nil {
 				findings = append(findings, engine.AnalyzeTableStats(*tableStatsSnapshot)...)
+			}
+
+			if queryStatsSnapshot != nil {
+				findings = append(findings, engine.AnalyzeQueryStats(*queryStatsSnapshot)...)
 			}
 
 			printFindings(findings)
@@ -334,6 +370,28 @@ func printTableHealthSummary(snapshot *metrics.TableStatsSnapshot) {
 		fmt.Printf("%d. %s.%s\n", i+1, table.SchemaName, table.TableName)
 		fmt.Printf("   Sequential Scans: %d\n", table.SequentialScans)
 		fmt.Printf("   Sequential Rows Read: %d\n", table.SequentialRowsRead)
+		fmt.Println()
+	}
+
+	fmt.Println("--------------------------------")
+}
+
+func printQueryPerformanceSummary(snapshot *metrics.QueryStatsSnapshot) {
+	fmt.Println("Query Performance Summary:")
+	fmt.Println()
+	fmt.Println("Top queries by total execution time:")
+	fmt.Println()
+
+	for i, q := range snapshot.Queries {
+		if i >= maxQuerySummaryItems {
+			break
+		}
+
+		fmt.Printf("%d. Calls: %d\n", i+1, q.Calls)
+		fmt.Printf("   Mean Time: %.1f ms\n", q.MeanExecutionTimeMs)
+		fmt.Printf("   Total Time: %.0f ms\n", q.TotalExecutionTimeMs)
+		fmt.Printf("   Rows Returned: %d\n", q.RowsReturned)
+		fmt.Printf("   Query Preview: %s\n", previewQuery(q.Query, maxQueryPreviewLength))
 		fmt.Println()
 	}
 

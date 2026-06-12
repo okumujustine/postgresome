@@ -34,3 +34,11 @@ type TableRule interface {
 	Name() string
 	Analyze(snapshot metrics.TableStatsSnapshot) []analysis.Finding
 }
+
+// QueryRule inspects a snapshot of pg_stat_statements statistics and reports
+// zero or more findings. Implementations satisfy analysis.QueryRule and can
+// be registered with an analysis.Engine via RegisterQueryRules.
+type QueryRule interface {
+	Name() string
+	Analyze(snapshot metrics.QueryStatsSnapshot) []analysis.Finding
+}
