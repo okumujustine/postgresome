@@ -33,6 +33,15 @@ export interface DashboardFinding {
   title: string;
   message: string;
   recommendation: string;
+  status: string;
+  rule_key: string;
+  resource_type: string;
+  resource_name: string;
+  current_value: number;
+  threshold_value: number;
+  occurrence_count: number;
+  first_seen_at: string;
+  last_seen_at: string;
   detected_at: string;
 }
 

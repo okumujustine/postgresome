@@ -38,6 +38,11 @@ func (r SlowQueryRule) Analyze(snapshot metrics.QueryStatsSnapshot) []analysis.F
 				Title:              "Critical slow query detected",
 				Message:            fmt.Sprintf("Query %q has a mean execution time of %.1f ms.", previewQuery(query.Query, queryPreviewMaxLength), query.MeanExecutionTimeMs),
 				Recommendation:     "Review query execution plan, indexes, joins, and filters.",
+				RuleKey:            r.Name(),
+				ResourceType:       "query",
+				ResourceName:       query.QueryID,
+				CurrentValue:       query.MeanExecutionTimeMs,
+				ThresholdValue:     slowQueryCriticalMeanExecutionTimeMs,
 			})
 
 		case query.MeanExecutionTimeMs >= slowQueryWarningMeanExecutionTimeMs:
@@ -49,6 +54,11 @@ func (r SlowQueryRule) Analyze(snapshot metrics.QueryStatsSnapshot) []analysis.F
 				Title:              "Slow query detected",
 				Message:            fmt.Sprintf("Query %q has a mean execution time of %.1f ms.", previewQuery(query.Query, queryPreviewMaxLength), query.MeanExecutionTimeMs),
 				Recommendation:     "Review query execution plan, indexes, joins, and filters.",
+				RuleKey:            r.Name(),
+				ResourceType:       "query",
+				ResourceName:       query.QueryID,
+				CurrentValue:       query.MeanExecutionTimeMs,
+				ThresholdValue:     slowQueryWarningMeanExecutionTimeMs,
 			})
 		}
 	}

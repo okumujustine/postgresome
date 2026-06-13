@@ -47,6 +47,11 @@ func (r LongRunningQueryRule) Analyze(snapshot metrics.DatabaseActivitySnapshot)
 				Title:              "Critical long running query detected",
 				Message:            fmt.Sprintf("A query has been executing for more than %.1f minutes on %s.", minutes, session),
 				Recommendation:     "Investigate immediately for inefficient queries, locks, or missing indexes.",
+				RuleKey:            r.Name(),
+				ResourceType:       "session",
+				ResourceName:       session,
+				CurrentValue:       minutes,
+				ThresholdValue:     longRunningQueryCriticalThreshold.Minutes(),
 			})
 			continue
 		}
@@ -59,6 +64,11 @@ func (r LongRunningQueryRule) Analyze(snapshot metrics.DatabaseActivitySnapshot)
 			Title:              "Long running query detected",
 			Message:            fmt.Sprintf("A query has been running for %.1f minutes on %s.", minutes, session),
 			Recommendation:     "Review query execution plan, indexes, and query complexity.",
+			RuleKey:            r.Name(),
+			ResourceType:       "session",
+			ResourceName:       session,
+			CurrentValue:       minutes,
+			ThresholdValue:     longRunningQueryWarningThreshold.Minutes(),
 		})
 	}
 

@@ -177,6 +177,13 @@ type findingPayload struct {
 	Title          string `json:"title"`
 	Message        string `json:"message"`
 	Recommendation string `json:"recommendation"`
+
+	RuleKey      string `json:"rule_key"`
+	ResourceType string `json:"resource_type"`
+	ResourceName string `json:"resource_name"`
+
+	CurrentValue   float64 `json:"current_value"`
+	ThresholdValue float64 `json:"threshold_value"`
 }
 
 // SendFindingsRequest is the payload sent to POST /api/findings/ingest.
@@ -414,6 +421,11 @@ func (c *AgentAPIClient) SendFindings(ctx context.Context, agentID string, datab
 			Title:          finding.Title,
 			Message:        finding.Message,
 			Recommendation: finding.Recommendation,
+			RuleKey:        finding.RuleKey,
+			ResourceType:   finding.ResourceType,
+			ResourceName:   finding.ResourceName,
+			CurrentValue:   finding.CurrentValue,
+			ThresholdValue: finding.ThresholdValue,
 		}
 	}
 

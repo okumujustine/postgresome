@@ -38,6 +38,8 @@ func (r AutovacuumLagRule) Analyze(snapshot metrics.TableStatsSnapshot) []analys
 		neverVacuumed := table.LastAutoVacuumAt == nil
 		staleVacuum := table.LastAutoVacuumAt != nil && snapshot.CollectedAt.Sub(*table.LastAutoVacuumAt) > autovacuumLagStaleThreshold
 
+		resourceName := fmt.Sprintf("%s.%s", table.SchemaName, table.TableName)
+
 		switch {
 		case (table.DeadRows >= autovacuumLagCriticalDeadRowsThreshold && neverVacuumed) ||
 			(deadRowRatio >= autovacuumLagCriticalDeadRowRatio && staleVacuum):
@@ -49,6 +51,11 @@ func (r AutovacuumLagRule) Analyze(snapshot metrics.TableStatsSnapshot) []analys
 				Title:              "Autovacuum is not keeping up",
 				Message:            fmt.Sprintf("Table %s.%s has significant dead row accumulation and no recent autovacuum activity.", table.SchemaName, table.TableName),
 				Recommendation:     "Investigate autovacuum configuration and consider manual VACUUM during a safe maintenance window.",
+				RuleKey:            r.Name(),
+				ResourceType:       "table",
+				ResourceName:       resourceName,
+				CurrentValue:       float64(table.DeadRows),
+				ThresholdValue:     autovacuumLagCriticalDeadRowsThreshold,
 			})
 
 		case table.DeadRows >= autovacuumLagWarningDeadRowsThreshold && (neverVacuumed || staleVacuum):
@@ -60,6 +67,11 @@ func (r AutovacuumLagRule) Analyze(snapshot metrics.TableStatsSnapshot) []analys
 				Title:              "Autovacuum may be lagging",
 				Message:            fmt.Sprintf("Table %s.%s has %s dead rows and has not been autovacuumed recently.", table.SchemaName, table.TableName, formatThousands(table.DeadRows)),
 				Recommendation:     "Review autovacuum settings, long-running transactions, and table update/delete workload.",
+				RuleKey:            r.Name(),
+				ResourceType:       "table",
+				ResourceName:       resourceName,
+				CurrentValue:       float64(table.DeadRows),
+				ThresholdValue:     autovacuumLagWarningDeadRowsThreshold,
 			})
 		}
 	}

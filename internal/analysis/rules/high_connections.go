@@ -34,6 +34,10 @@ func (r HighConnectionRule) Analyze(stats metrics.DatabaseStats, delta metrics.D
 			Title:              "Critical database connection pressure",
 			Message:            fmt.Sprintf("Database has %d active connections which may affect performance.", connections),
 			Recommendation:     "Investigate connection spikes, idle connections, and connection pooling configuration.",
+			RuleKey:            r.Name(),
+			ResourceType:       "database",
+			CurrentValue:       float64(connections),
+			ThresholdValue:     highConnectionsCriticalThreshold,
 		}}
 
 	case connections > highConnectionsWarningThreshold:
@@ -45,6 +49,10 @@ func (r HighConnectionRule) Analyze(stats metrics.DatabaseStats, delta metrics.D
 			Title:              "High database connections detected",
 			Message:            fmt.Sprintf("Database currently has %d active connections.", connections),
 			Recommendation:     "Review application connection pooling and check for connection leaks.",
+			RuleKey:            r.Name(),
+			ResourceType:       "database",
+			CurrentValue:       float64(connections),
+			ThresholdValue:     highConnectionsWarningThreshold,
 		}}
 
 	default:

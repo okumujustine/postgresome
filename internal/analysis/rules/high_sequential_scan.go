@@ -32,6 +32,8 @@ func (r HighSequentialScanRule) Analyze(snapshot metrics.TableStatsSnapshot) []a
 			sequentialScanRatio = float64(table.SequentialScans) / float64(totalScans)
 		}
 
+		resourceName := fmt.Sprintf("%s.%s", table.SchemaName, table.TableName)
+
 		switch {
 		case sequentialScanRatio >= highSequentialScanCriticalRatio && table.SequentialRowsRead >= highSequentialScanCriticalRowsThreshold:
 			findings = append(findings, analysis.Finding{
@@ -42,6 +44,11 @@ func (r HighSequentialScanRule) Analyze(snapshot metrics.TableStatsSnapshot) []a
 				Title:              "Critical sequential scan pressure detected",
 				Message:            fmt.Sprintf("Table %s.%s has heavy sequential scan activity and is reading many rows.", table.SchemaName, table.TableName),
 				Recommendation:     "Investigate slow queries and missing indexes for this table.",
+				RuleKey:            r.Name(),
+				ResourceType:       "table",
+				ResourceName:       resourceName,
+				CurrentValue:       sequentialScanRatio,
+				ThresholdValue:     highSequentialScanCriticalRatio,
 			})
 
 		case sequentialScanRatio >= highSequentialScanWarningRatio && table.SequentialRowsRead >= highSequentialScanWarningRowsThreshold:
@@ -53,6 +60,11 @@ func (r HighSequentialScanRule) Analyze(snapshot metrics.TableStatsSnapshot) []a
 				Title:              "High sequential scan activity detected",
 				Message:            fmt.Sprintf("Table %s.%s is using sequential scans for a large share of reads.", table.SchemaName, table.TableName),
 				Recommendation:     "Review query patterns and consider whether frequently filtered columns need indexes.",
+				RuleKey:            r.Name(),
+				ResourceType:       "table",
+				ResourceName:       resourceName,
+				CurrentValue:       sequentialScanRatio,
+				ThresholdValue:     highSequentialScanWarningRatio,
 			})
 		}
 	}

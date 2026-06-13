@@ -33,6 +33,10 @@ func (r HighRollbackRateRule) Analyze(stats metrics.DatabaseStats, delta metrics
 			Title:              "High transaction rollback rate detected",
 			Message:            "A large percentage of database work is being discarded due to rollbacks.",
 			Recommendation:     "Investigate application failures, constraint violations, deadlocks, or timeout issues.",
+			RuleKey:            r.Name(),
+			ResourceType:       "database",
+			CurrentValue:       rate,
+			ThresholdValue:     highRollbackRateCriticalThreshold,
 		}}
 
 	case rate >= highRollbackRateWarningThreshold:
@@ -44,6 +48,10 @@ func (r HighRollbackRateRule) Analyze(stats metrics.DatabaseStats, delta metrics
 			Title:              "Elevated transaction rollback rate detected",
 			Message:            fmt.Sprintf("%.1f%% of recent database transactions are rolling back.", rate*100),
 			Recommendation:     "Review application errors, failed queries, and transaction handling.",
+			RuleKey:            r.Name(),
+			ResourceType:       "database",
+			CurrentValue:       rate,
+			ThresholdValue:     highRollbackRateWarningThreshold,
 		}}
 
 	default:

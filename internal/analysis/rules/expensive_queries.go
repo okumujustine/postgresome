@@ -35,6 +35,11 @@ func (r ExpensiveQueryRule) Analyze(snapshot metrics.QueryStatsSnapshot) []analy
 				Title:              "Critical query cost detected",
 				Message:            fmt.Sprintf("Query %q has a total execution time of %.0f ms across %d calls.", previewQuery(query.Query, queryPreviewMaxLength), query.TotalExecutionTimeMs, query.Calls),
 				Recommendation:     "This query consumes significant database time. Review frequency, indexing, and whether results can be cached or optimized.",
+				RuleKey:            r.Name(),
+				ResourceType:       "query",
+				ResourceName:       query.QueryID,
+				CurrentValue:       query.TotalExecutionTimeMs,
+				ThresholdValue:     expensiveQueryCriticalTotalExecutionTimeMs,
 			})
 
 		case query.TotalExecutionTimeMs >= expensiveQueryWarningTotalExecutionTimeMs:
@@ -46,6 +51,11 @@ func (r ExpensiveQueryRule) Analyze(snapshot metrics.QueryStatsSnapshot) []analy
 				Title:              "High total query cost detected",
 				Message:            fmt.Sprintf("Query %q has a total execution time of %.0f ms across %d calls.", previewQuery(query.Query, queryPreviewMaxLength), query.TotalExecutionTimeMs, query.Calls),
 				Recommendation:     "This query consumes significant database time. Review frequency, indexing, and whether results can be cached or optimized.",
+				RuleKey:            r.Name(),
+				ResourceType:       "query",
+				ResourceName:       query.QueryID,
+				CurrentValue:       query.TotalExecutionTimeMs,
+				ThresholdValue:     expensiveQueryWarningTotalExecutionTimeMs,
 			})
 		}
 	}

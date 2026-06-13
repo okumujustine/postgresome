@@ -113,6 +113,9 @@ type queryStatDTO struct {
 	MaxExecTimeMs   float64 `json:"max_exec_time_ms"`
 
 	RowsReturned int64 `json:"rows_returned"`
+
+	SharedBlocksRead int64 `json:"shared_blocks_read"`
+	SharedBlocksHit  int64 `json:"shared_blocks_hit"`
 }
 
 // handleListQueryStats serves GET /api/queries, returning the latest query
@@ -151,7 +154,7 @@ func (s *Server) handleListQueryStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	severityCounts, err := repository.CountFindingsBySeverity(ctx, s.pool, databaseInstanceID, agentID, time.Now().Add(-1*time.Hour))
+	severityCounts, err := repository.CountFindingsBySeverity(ctx, s.pool, databaseInstanceID, agentID)
 	if err != nil {
 		log.Printf("failed to count findings by severity: %v", err)
 		http.Error(w, "failed to load query stats", http.StatusInternalServerError)
@@ -183,6 +186,9 @@ func (s *Server) handleListQueryStats(w http.ResponseWriter, r *http.Request) {
 			MinExecTimeMs:   q.MinExecTimeMs,
 			MaxExecTimeMs:   q.MaxExecTimeMs,
 			RowsReturned:    q.RowsReturned,
+
+			SharedBlocksRead: q.SharedBlocksRead,
+			SharedBlocksHit:  q.SharedBlocksHit,
 		}
 	}
 

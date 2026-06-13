@@ -40,6 +40,11 @@ func (r DiskHeavyQueryRule) Analyze(snapshot metrics.QueryStatsSnapshot) []analy
 				Title:              "Critical disk-heavy query detected",
 				Message:            fmt.Sprintf("Query %q reads %.1f%% of its blocks from disk.", previewQuery(query.Query, queryPreviewMaxLength), diskReadRatio*100),
 				Recommendation:     "This query reads a large portion of blocks from disk. Investigate missing indexes, inefficient scans, and memory/cache behavior.",
+				RuleKey:            r.Name(),
+				ResourceType:       "query",
+				ResourceName:       query.QueryID,
+				CurrentValue:       diskReadRatio,
+				ThresholdValue:     diskHeavyQueryCriticalReadRatio,
 			})
 
 		case diskReadRatio >= diskHeavyQueryWarningReadRatio:
@@ -51,6 +56,11 @@ func (r DiskHeavyQueryRule) Analyze(snapshot metrics.QueryStatsSnapshot) []analy
 				Title:              "Disk-heavy query detected",
 				Message:            fmt.Sprintf("Query %q reads %.1f%% of its blocks from disk.", previewQuery(query.Query, queryPreviewMaxLength), diskReadRatio*100),
 				Recommendation:     "This query reads a large portion of blocks from disk. Investigate missing indexes, inefficient scans, and memory/cache behavior.",
+				RuleKey:            r.Name(),
+				ResourceType:       "query",
+				ResourceName:       query.QueryID,
+				CurrentValue:       diskReadRatio,
+				ThresholdValue:     diskHeavyQueryWarningReadRatio,
 			})
 		}
 	}

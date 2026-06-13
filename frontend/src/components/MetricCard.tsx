@@ -7,9 +7,10 @@ interface MetricCardProps {
   trendPercent?: number | null;
   invertTrend?: boolean;
   icon?: ReactNode;
+  hideFooter?: boolean;
 }
 
-export function MetricCard({ label, value, unit, trendPercent, invertTrend = false, icon }: MetricCardProps) {
+export function MetricCard({ label, value, unit, trendPercent, invertTrend = false, icon, hideFooter = false }: MetricCardProps) {
   const hasTrend = trendPercent != null && !Number.isNaN(trendPercent) && trendPercent !== 0;
   const up = hasTrend && trendPercent! >= 0;
   const good = !hasTrend ? null : invertTrend ? !up : up;
@@ -55,7 +56,7 @@ export function MetricCard({ label, value, unit, trendPercent, invertTrend = fal
         )}
       </div>
 
-      {hasTrend ? (
+      {hideFooter ? null : hasTrend ? (
         <div className="flex items-center gap-[5px] text-[12.5px] font-medium" style={{ color: deltaColor }}>
           <svg
             width="12"

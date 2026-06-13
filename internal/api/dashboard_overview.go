@@ -47,13 +47,49 @@ type dashboardFindingsDTO struct {
 }
 
 type dashboardFindingDTO struct {
-	ID             string    `json:"id"`
-	Severity       string    `json:"severity"`
-	Category       string    `json:"category"`
-	Title          string    `json:"title"`
-	Message        string    `json:"message"`
-	Recommendation string    `json:"recommendation"`
-	DetectedAt     time.Time `json:"detected_at"`
+	ID             string `json:"id"`
+	Severity       string `json:"severity"`
+	Category       string `json:"category"`
+	Title          string `json:"title"`
+	Message        string `json:"message"`
+	Recommendation string `json:"recommendation"`
+	Status         string `json:"status"`
+
+	RuleKey      string `json:"rule_key"`
+	ResourceType string `json:"resource_type"`
+	ResourceName string `json:"resource_name"`
+
+	CurrentValue   float64 `json:"current_value"`
+	ThresholdValue float64 `json:"threshold_value"`
+
+	OccurrenceCount int       `json:"occurrence_count"`
+	FirstSeenAt     time.Time `json:"first_seen_at"`
+	LastSeenAt      time.Time `json:"last_seen_at"`
+	DetectedAt      time.Time `json:"detected_at"`
+}
+
+// toDashboardFindingDTO maps a repository finding row to its API
+// representation. DetectedAt mirrors LastSeenAt for backward-compatible
+// "time since detected" displays.
+func toDashboardFindingDTO(f repository.RecentFinding) dashboardFindingDTO {
+	return dashboardFindingDTO{
+		ID:              f.ID,
+		Severity:        f.Severity,
+		Category:        f.Category,
+		Title:           f.Title,
+		Message:         f.Message,
+		Recommendation:  f.Recommendation,
+		Status:          f.Status,
+		RuleKey:         f.RuleKey,
+		ResourceType:    f.ResourceType,
+		ResourceName:    f.ResourceName,
+		CurrentValue:    f.CurrentValue,
+		ThresholdValue:  f.ThresholdValue,
+		OccurrenceCount: f.OccurrenceCount,
+		FirstSeenAt:     f.FirstSeenAt,
+		LastSeenAt:      f.LastSeenAt,
+		DetectedAt:      f.LastSeenAt,
+	}
 }
 
 // handleDashboardOverview serves GET /api/dashboard/overview, an aggregation
@@ -130,7 +166,7 @@ func (s *Server) handleDashboardOverview(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	severityCounts, err := repository.CountFindingsBySeverity(ctx, s.pool, databaseInstanceID, agentID, currentStart)
+	severityCounts, err := repository.CountFindingsBySeverity(ctx, s.pool, databaseInstanceID, agentID)
 	if err != nil {
 		log.Printf("failed to count findings by severity: %v", err)
 		http.Error(w, "failed to load dashboard overview", http.StatusInternalServerError)
@@ -146,15 +182,7 @@ func (s *Server) handleDashboardOverview(w http.ResponseWriter, r *http.Request)
 
 	recentDTOs := make([]dashboardFindingDTO, len(recentFindings))
 	for i, f := range recentFindings {
-		recentDTOs[i] = dashboardFindingDTO{
-			ID:             f.ID,
-			Severity:       f.Severity,
-			Category:       f.Category,
-			Title:          f.Title,
-			Message:        f.Message,
-			Recommendation: f.Recommendation,
-			DetectedAt:     f.DetectedAt,
-		}
+		recentDTOs[i] = toDashboardFindingDTO(f)
 	}
 
 	instanceDTO := dashboardDatabaseInstanceDTO{

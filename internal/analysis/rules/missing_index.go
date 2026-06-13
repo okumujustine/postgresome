@@ -31,11 +31,14 @@ func (r MissingIndexRule) Analyze(snapshot metrics.ExplainSnapshot) []analysis.F
 			}
 
 			var severity string
+			var thresholdValue float64
 			switch {
 			case node.PlanRows >= seqScanCriticalRows:
 				severity = "critical"
+				thresholdValue = seqScanCriticalRows
 			case node.PlanRows >= seqScanWarningRows:
 				severity = "warning"
+				thresholdValue = seqScanWarningRows
 			default:
 				return
 			}
@@ -55,6 +58,11 @@ func (r MissingIndexRule) Analyze(snapshot metrics.ExplainSnapshot) []analysis.F
 				Title:              "Sequential scan on large table",
 				Message:            fmt.Sprintf("Query %q performs a sequential scan on %q reading an estimated %.0f rows.", previewQuery(plan.Query, queryPreviewMaxLength), node.RelationName, node.PlanRows),
 				Recommendation:     recommendation,
+				RuleKey:            r.Name(),
+				ResourceType:       "query_plan",
+				ResourceName:       fmt.Sprintf("%s:%s", plan.QueryID, node.RelationName),
+				CurrentValue:       node.PlanRows,
+				ThresholdValue:     thresholdValue,
 			})
 		})
 	}

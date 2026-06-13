@@ -42,6 +42,13 @@ func (r ExpensiveSortRule) Analyze(snapshot metrics.ExplainSnapshot) []analysis.
 
 			sortKey := strings.Join(node.SortKey, ", ")
 
+			var thresholdValue float64
+			if severity == "critical" {
+				thresholdValue = sortCostCriticalThreshold
+			} else {
+				thresholdValue = sortCostWarningThreshold
+			}
+
 			findings = append(findings, analysis.Finding{
 				DetectedAt:         snapshot.CollectedAt,
 				DatabaseInstanceID: snapshot.DatabaseInstanceID,
@@ -50,6 +57,11 @@ func (r ExpensiveSortRule) Analyze(snapshot metrics.ExplainSnapshot) []analysis.
 				Title:              "Expensive sort operation",
 				Message:            fmt.Sprintf("Query %q sorts an estimated %.0f rows by (%s) at planner cost %.0f.", previewQuery(plan.Query, queryPreviewMaxLength), node.PlanRows, sortKey, node.TotalCost),
 				Recommendation:     fmt.Sprintf("Consider an index on (%s) to avoid sorting at query time, or review work_mem if this sort spills to disk.", sortKey),
+				RuleKey:            r.Name(),
+				ResourceType:       "query_plan",
+				ResourceName:       fmt.Sprintf("%s:%s", plan.QueryID, sortKey),
+				CurrentValue:       node.TotalCost,
+				ThresholdValue:     thresholdValue,
 			})
 		})
 	}

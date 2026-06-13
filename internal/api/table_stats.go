@@ -165,7 +165,7 @@ func (s *Server) handleListTableStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	severityCounts, err := repository.CountFindingsBySeverity(ctx, s.pool, databaseInstanceID, agentID, time.Now().Add(-1*time.Hour))
+	severityCounts, err := repository.CountFindingsBySeverity(ctx, s.pool, databaseInstanceID, agentID)
 	if err != nil {
 		log.Printf("failed to count findings by severity: %v", err)
 		http.Error(w, "failed to load table stats", http.StatusInternalServerError)

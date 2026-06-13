@@ -5,7 +5,7 @@ import { ApiError } from '../api/client';
 import type { QueryStatsResponse } from '../types/queries';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
-import { formatDuration, formatRelativeTime } from '../lib/format';
+import { formatBytes, formatDuration, formatRelativeTime } from '../lib/format';
 import { useDatabaseInstance } from '../lib/databaseInstance';
 
 export function QueriesPage() {
@@ -75,7 +75,11 @@ export function QueriesPage() {
         ) : (
           <Card
             title="Queries"
-            subtitle={data.collected_at ? `Snapshot from ${formatRelativeTime(data.collected_at)}` : undefined}
+            subtitle={
+              data.collected_at
+                ? `Sorted by impact (calls × execution time) · Snapshot from ${formatRelativeTime(data.collected_at)}`
+                : 'Sorted by impact (calls × execution time)'
+            }
           >
             <div className="overflow-x-auto">
               <table className="w-full text-left text-[13px]" style={{ borderCollapse: 'collapse' }}>
@@ -83,8 +87,10 @@ export function QueriesPage() {
                   <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                     <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Query</th>
                     <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Calls</th>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Avg time</th>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Total time (impact)</th>
+                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Average time</th>
+                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Total impact</th>
+                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Rows</th>
+                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Disk usage</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -107,6 +113,12 @@ export function QueriesPage() {
                       </td>
                       <td className="py-2 pr-4 font-semibold tabular" style={{ color: 'var(--text-primary)' }}>
                         {formatDuration(q.total_exec_time_ms)}
+                      </td>
+                      <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
+                        {q.rows_returned.toLocaleString()}
+                      </td>
+                      <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
+                        {formatBytes(q.shared_blocks_read)}
                       </td>
                     </tr>
                   ))}

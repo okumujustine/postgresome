@@ -40,6 +40,10 @@ func (r BlockedQueryRule) Analyze(snapshot metrics.DatabaseActivitySnapshot) []a
 			Title:              "Critical database lock contention detected",
 			Message:            "Multiple database sessions are blocked waiting for locks.",
 			Recommendation:     "Identify blocking queries and investigate transaction handling immediately.",
+			RuleKey:            r.Name(),
+			ResourceType:       "database",
+			CurrentValue:       float64(blocked),
+			ThresholdValue:     blockedQueryCriticalThreshold,
 		}}
 
 	case blocked >= blockedQueryWarningThreshold:
@@ -51,6 +55,10 @@ func (r BlockedQueryRule) Analyze(snapshot metrics.DatabaseActivitySnapshot) []a
 			Title:              "Blocked database queries detected",
 			Message:            fmt.Sprintf("%d database sessions are waiting on locks.", blocked),
 			Recommendation:     "Review long-running transactions and queries holding locks.",
+			RuleKey:            r.Name(),
+			ResourceType:       "database",
+			CurrentValue:       float64(blocked),
+			ThresholdValue:     blockedQueryWarningThreshold,
 		}}
 
 	default:

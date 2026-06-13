@@ -7,6 +7,7 @@ export interface ListFindingsParams {
   range?: MetricRange;
   severity?: string;
   category?: string;
+  status?: string;
   limit?: number;
   offset?: number;
 }
@@ -18,6 +19,7 @@ export function listFindings(params: ListFindingsParams = {}): Promise<FindingsL
     range: params.range,
     severity: params.severity,
     category: params.category,
+    status: params.status,
     limit: params.limit !== undefined ? String(params.limit) : undefined,
     offset: params.offset !== undefined ? String(params.offset) : undefined,
   });

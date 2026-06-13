@@ -11,6 +11,8 @@ export interface QueryStat {
   min_exec_time_ms: number;
   max_exec_time_ms: number;
   rows_returned: number;
+  shared_blocks_read: number;
+  shared_blocks_hit: number;
 }
 
 export interface QueryStatsResponse {

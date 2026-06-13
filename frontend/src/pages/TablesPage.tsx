@@ -9,11 +9,21 @@ import { formatRelativeTime } from '../lib/format';
 import { useDatabaseInstance } from '../lib/databaseInstance';
 
 const DEAD_ROW_WARNING_RATIO = 20;
+const INDEX_USAGE_WARNING_RATIO = 50;
+const INDEX_USAGE_MIN_SCANS = 10;
 
 function deadRowRatio(table: TableStat): number {
   const total = table.live_rows + table.dead_rows;
   if (total === 0) return 0;
   return (table.dead_rows / total) * 100;
+}
+
+// indexUsageRatio returns the percentage of scans served by an index rather
+// than a sequential scan, or null if the table has too few scans to judge.
+function indexUsageRatio(table: TableStat): number | null {
+  const totalScans = table.index_scans + table.sequential_scans;
+  if (totalScans === 0) return null;
+  return (table.index_scans / totalScans) * 100;
 }
 
 export function TablesPage() {
@@ -92,6 +102,7 @@ export function TablesPage() {
                     <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Table</th>
                     <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Live rows</th>
                     <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Dead rows</th>
+                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Index usage</th>
                     <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Seq scans</th>
                     <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Vacuum status</th>
                   </tr>
@@ -101,6 +112,11 @@ export function TablesPage() {
                     const ratio = deadRowRatio(table);
                     const ratioHigh = ratio > DEAD_ROW_WARNING_RATIO;
                     const lastVacuum = table.last_autovacuum_at ?? table.last_vacuum_at;
+                    const idxUsage = indexUsageRatio(table);
+                    const idxUsageLow =
+                      idxUsage !== null &&
+                      idxUsage < INDEX_USAGE_WARNING_RATIO &&
+                      table.index_scans + table.sequential_scans >= INDEX_USAGE_MIN_SCANS;
 
                     return (
                       <tr key={`${table.schema_name}.${table.table_name}`} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -112,6 +128,9 @@ export function TablesPage() {
                         </td>
                         <td className="py-2 pr-4 tabular" style={{ color: ratioHigh ? 'var(--warning)' : 'var(--text-primary)' }}>
                           {table.dead_rows.toLocaleString()} ({ratio.toFixed(1)}%)
+                        </td>
+                        <td className="py-2 pr-4 tabular" style={{ color: idxUsageLow ? 'var(--warning)' : 'var(--text-primary)' }}>
+                          {idxUsage === null ? '—' : `${idxUsage.toFixed(1)}%`}
                         </td>
                         <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
                           {table.sequential_scans.toLocaleString()}

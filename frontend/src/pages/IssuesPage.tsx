@@ -2,13 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 import { ChevronDown, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { listFindings } from '../api/findings';
 import { ApiError } from '../api/client';
-import type { FindingsListResponse, MetricRange } from '../types/dashboard';
+import type { FindingsListResponse } from '../types/dashboard';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
-import { FindingCard } from '../components/FindingCard';
+import { IssueRow } from '../components/IssueRow';
 import { useDatabaseInstance } from '../lib/databaseInstance';
 
 const PAGE_SIZE = 20;
+
+// Issues are an open-ended tracker, not a time-series view — use the widest
+// available range so open/resolved issues aren't hidden by a short window.
+const ISSUES_RANGE = '7d';
 
 const SEVERITY_OPTIONS = [
   { value: '', label: 'All severities' },
@@ -26,6 +30,11 @@ const CATEGORY_OPTIONS = [
   { value: 'transactions', label: 'Transactions' },
   { value: 'cache', label: 'Cache' },
   { value: 'query_plan', label: 'Query Plan' },
+];
+
+const STATUS_TABS: { value: string; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'resolved', label: 'Resolved' },
 ];
 
 function FilterSelect({
@@ -59,9 +68,9 @@ function FilterSelect({
 }
 
 export function IssuesPage() {
-  const [range, setRange] = useState<MetricRange>('1h');
   const [severity, setSeverity] = useState('');
   const [category, setCategory] = useState('');
+  const [status, setStatus] = useState('open');
   const [offset, setOffset] = useState(0);
   const [data, setData] = useState<FindingsListResponse | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -70,9 +79,9 @@ export function IssuesPage() {
 
   const load = useCallback(
     async (
-      currentRange: MetricRange,
       currentSeverity: string,
       currentCategory: string,
+      currentStatus: string,
       currentOffset: number,
       databaseInstanceId: string,
       isRefresh: boolean,
@@ -83,9 +92,10 @@ export function IssuesPage() {
 
       try {
         const result = await listFindings({
-          range: currentRange,
+          range: ISSUES_RANGE,
           severity: currentSeverity || undefined,
           category: currentCategory || undefined,
+          status: currentStatus,
           limit: PAGE_SIZE,
           offset: currentOffset,
           databaseInstanceId,
@@ -109,8 +119,8 @@ export function IssuesPage() {
     if (instanceLoading || !selectedId) return;
     // load() only updates state after its internal await, not synchronously.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load(range, severity, category, offset, selectedId, false);
-  }, [range, severity, category, offset, selectedId, instanceLoading, load]);
+    load(severity, category, status, offset, selectedId, false);
+  }, [severity, category, status, offset, selectedId, instanceLoading, load]);
 
   const loading = data === null && error === null;
 
@@ -122,16 +132,7 @@ export function IssuesPage() {
   const rangeEnd = Math.min(offset + PAGE_SIZE, total);
 
   return (
-    <Layout
-      title="Issues"
-      range={range}
-      onRangeChange={(value) => {
-        setRange(value);
-        setOffset(0);
-      }}
-      onRefresh={() => load(range, severity, category, offset, selectedId, true)}
-      refreshing={refreshing}
-    >
+    <Layout title="Issues" onRefresh={() => load(severity, category, status, offset, selectedId, true)} refreshing={refreshing}>
       {error && (
         <div
           className="mb-6 rounded-[var(--radius-lg)] border px-4 py-3 text-sm"
@@ -141,23 +142,44 @@ export function IssuesPage() {
         </div>
       )}
 
-      <div className="mb-[14px] flex flex-wrap items-center gap-[10px]">
-        <FilterSelect
-          value={severity}
-          onChange={(value) => {
-            setSeverity(value);
-            setOffset(0);
-          }}
-          options={SEVERITY_OPTIONS}
-        />
-        <FilterSelect
-          value={category}
-          onChange={(value) => {
-            setCategory(value);
-            setOffset(0);
-          }}
-          options={CATEGORY_OPTIONS}
-        />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+        <div className="flex items-center gap-1">
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => {
+                setStatus(tab.value);
+                setOffset(0);
+              }}
+              className="relative cursor-pointer border-0 bg-transparent px-3 py-2 text-[13.5px] font-semibold"
+              style={{ color: status === tab.value ? 'var(--text-primary)' : 'var(--text-muted)' }}
+            >
+              {tab.label}
+              {status === tab.value && (
+                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] rounded-[1px]" style={{ background: 'var(--accent)' }} />
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="mb-2 flex flex-wrap items-center gap-[10px]">
+          <FilterSelect
+            value={severity}
+            onChange={(value) => {
+              setSeverity(value);
+              setOffset(0);
+            }}
+            options={SEVERITY_OPTIONS}
+          />
+          <FilterSelect
+            value={category}
+            onChange={(value) => {
+              setCategory(value);
+              setOffset(0);
+            }}
+            options={CATEGORY_OPTIONS}
+          />
+        </div>
       </div>
 
       {loading && !data ? (
@@ -167,18 +189,20 @@ export function IssuesPage() {
         </div>
       ) : data ? (
         <Card
-          title="Issues"
+          title={status === 'open' ? 'Open issues' : 'Resolved issues'}
           subtitle={`${total} issue${total === 1 ? '' : 's'} · ${counts.critical} critical · ${counts.warning} warning · ${counts.info} info`}
         >
           {findings.length === 0 ? (
             <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              No issues match these filters.
+              {status === 'open' ? 'No open issues match these filters — nice work.' : 'No resolved issues match these filters.'}
             </div>
           ) : (
             <>
-              <div className="flex flex-col gap-3">
-                {findings.map((finding) => (
-                  <FindingCard key={finding.id} finding={finding} />
+              <div className="flex flex-col">
+                {findings.map((finding, index) => (
+                  <div key={finding.id} style={{ borderTop: index === 0 ? 'none' : '1px solid var(--border-subtle)' }}>
+                    <IssueRow finding={finding} />
+                  </div>
                 ))}
               </div>
 

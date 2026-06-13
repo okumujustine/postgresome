@@ -9,16 +9,43 @@ import (
 	"github.com/okumujustine/postgresome/internal/analysis"
 )
 
-const insertFindingSQL = `
-	INSERT INTO findings (id, severity, category, title, message, recommendation, database_instance_id, agent_id, created_at)
-	VALUES (COALESCE(NULLIF($1, '')::uuid, gen_random_uuid()), $2, $3, $4, $5, $6, $7, NULLIF($8, ''), $9)
+const upsertFindingSQL = `
+	INSERT INTO findings (
+		severity, category, title, message, recommendation,
+		database_instance_id, agent_id,
+		rule_key, resource_type, resource_name, fingerprint,
+		current_value, threshold_value,
+		status, occurrence_count, first_seen_at, last_seen_at, created_at
+	) VALUES (
+		$1, $2, $3, $4, $5,
+		$6, NULLIF($7, ''),
+		$8, $9, $10, $11,
+		$12, $13,
+		'open', 1, $14, $14, $14
+	)
+	ON CONFLICT (database_instance_id, fingerprint) DO UPDATE SET
+		severity = EXCLUDED.severity,
+		category = EXCLUDED.category,
+		title = EXCLUDED.title,
+		message = EXCLUDED.message,
+		recommendation = EXCLUDED.recommendation,
+		agent_id = EXCLUDED.agent_id,
+		current_value = EXCLUDED.current_value,
+		threshold_value = EXCLUDED.threshold_value,
+		status = 'open',
+		resolved_at = NULL,
+		occurrence_count = findings.occurrence_count + 1,
+		last_seen_at = EXCLUDED.last_seen_at
 `
 
-// InsertFindings persists analyzer findings into the findings table.
-func InsertFindings(ctx context.Context, pool *pgxpool.Pool, findings []analysis.Finding) error {
+// UpsertFindings persists analyzer findings, deduplicating on
+// (database_instance_id, fingerprint). A finding whose fingerprint matches
+// an existing row bumps occurrence_count and last_seen_at, and reopens the
+// finding (status='open', resolved_at=NULL) if it had previously been
+// resolved.
+func UpsertFindings(ctx context.Context, pool *pgxpool.Pool, findings []analysis.Finding) error {
 	for _, finding := range findings {
-		_, err := pool.Exec(ctx, insertFindingSQL,
-			finding.ID,
+		_, err := pool.Exec(ctx, upsertFindingSQL,
 			finding.Severity,
 			finding.Category,
 			finding.Title,
@@ -26,11 +53,41 @@ func InsertFindings(ctx context.Context, pool *pgxpool.Pool, findings []analysis
 			finding.Recommendation,
 			finding.DatabaseInstanceID,
 			finding.AgentID,
+			finding.RuleKey,
+			finding.ResourceType,
+			finding.ResourceName,
+			finding.Fingerprint(),
+			finding.CurrentValue,
+			finding.ThresholdValue,
 			finding.DetectedAt,
 		)
 		if err != nil {
-			return fmt.Errorf("failed to insert finding %q: %w", finding.Title, err)
+			return fmt.Errorf("failed to upsert finding %q: %w", finding.Title, err)
 		}
+	}
+
+	return nil
+}
+
+const resolveStaleFindingsSQL = `
+	UPDATE findings
+	SET status = 'resolved', resolved_at = $2
+	WHERE database_instance_id = $1
+	  AND status = 'open'
+	  AND last_seen_at < $3
+`
+
+// ResolveStaleFindings marks open findings for the given database instance as
+// resolved if they were not re-detected within the grace period ending at
+// now (last_seen_at < now - gracePeriod). It should be run once per ingest
+// cycle, after upserting that cycle's findings, so issues that stop
+// recurring are automatically closed.
+func ResolveStaleFindings(ctx context.Context, pool *pgxpool.Pool, databaseInstanceID string, now time.Time, gracePeriod time.Duration) error {
+	cutoff := now.Add(-gracePeriod)
+
+	_, err := pool.Exec(ctx, resolveStaleFindingsSQL, databaseInstanceID, now, cutoff)
+	if err != nil {
+		return fmt.Errorf("failed to resolve stale findings: %w", err)
 	}
 
 	return nil
@@ -39,24 +96,24 @@ func InsertFindings(ctx context.Context, pool *pgxpool.Pool, findings []analysis
 const countFindingsBySeveritySQL = `
 	SELECT severity, count(*)
 	FROM findings
-	WHERE created_at >= $1
-	  AND ($2 = '' OR database_instance_id = $2)
-	  AND ($3 = '' OR agent_id = $3)
+	WHERE status = 'open'
+	  AND ($1 = '' OR database_instance_id = $1)
+	  AND ($2 = '' OR agent_id = $2)
 	GROUP BY severity
 `
 
-// FindingSeverityCounts holds the number of findings detected at or after a
-// given time, grouped by severity.
+// FindingSeverityCounts holds the number of currently open findings, grouped
+// by severity.
 type FindingSeverityCounts struct {
 	Critical int
 	Warning  int
 	Info     int
 }
 
-// CountFindingsBySeverity counts findings detected since the given time,
-// grouped by severity.
-func CountFindingsBySeverity(ctx context.Context, pool *pgxpool.Pool, databaseInstanceID, agentID string, since time.Time) (FindingSeverityCounts, error) {
-	rows, err := pool.Query(ctx, countFindingsBySeveritySQL, since, databaseInstanceID, agentID)
+// CountFindingsBySeverity counts currently open findings, grouped by
+// severity.
+func CountFindingsBySeverity(ctx context.Context, pool *pgxpool.Pool, databaseInstanceID, agentID string) (FindingSeverityCounts, error) {
+	rows, err := pool.Query(ctx, countFindingsBySeveritySQL, databaseInstanceID, agentID)
 	if err != nil {
 		return FindingSeverityCounts{}, fmt.Errorf("failed to count findings by severity: %w", err)
 	}
@@ -88,16 +145,20 @@ func CountFindingsBySeverity(ctx context.Context, pool *pgxpool.Pool, databaseIn
 }
 
 const getRecentFindingsSQL = `
-	SELECT id::text, severity, category, title, message, recommendation, created_at
+	SELECT id::text, severity, category, title, message, recommendation, status,
+	       rule_key, resource_type, resource_name, current_value, threshold_value,
+	       occurrence_count, first_seen_at, last_seen_at
 	FROM findings
-	WHERE created_at >= $1
+	WHERE status = 'open'
+	  AND last_seen_at >= $1
 	  AND ($2 = '' OR database_instance_id = $2)
 	  AND ($3 = '' OR agent_id = $3)
-	ORDER BY created_at DESC
+	ORDER BY last_seen_at DESC
 	LIMIT $4
 `
 
-// RecentFinding is a finding row returned for dashboard summaries.
+// RecentFinding is a finding row returned for dashboard summaries and
+// findings list views.
 type RecentFinding struct {
 	ID             string
 	Severity       string
@@ -105,11 +166,22 @@ type RecentFinding struct {
 	Title          string
 	Message        string
 	Recommendation string
-	DetectedAt     time.Time
+	Status         string
+
+	RuleKey      string
+	ResourceType string
+	ResourceName string
+
+	CurrentValue   float64
+	ThresholdValue float64
+
+	OccurrenceCount int
+	FirstSeenAt     time.Time
+	LastSeenAt      time.Time
 }
 
-// GetRecentFindings returns the most recent findings detected since the given
-// time, newest first, up to limit results.
+// GetRecentFindings returns open findings last seen at or after the given
+// time, most recently active first, up to limit results.
 func GetRecentFindings(ctx context.Context, pool *pgxpool.Pool, databaseInstanceID, agentID string, since time.Time, limit int) ([]RecentFinding, error) {
 	rows, err := pool.Query(ctx, getRecentFindingsSQL, since, databaseInstanceID, agentID, limit)
 	if err != nil {
@@ -120,7 +192,9 @@ func GetRecentFindings(ctx context.Context, pool *pgxpool.Pool, databaseInstance
 	findings := make([]RecentFinding, 0)
 	for rows.Next() {
 		var f RecentFinding
-		if err := rows.Scan(&f.ID, &f.Severity, &f.Category, &f.Title, &f.Message, &f.Recommendation, &f.DetectedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.Severity, &f.Category, &f.Title, &f.Message, &f.Recommendation, &f.Status,
+			&f.RuleKey, &f.ResourceType, &f.ResourceName, &f.CurrentValue, &f.ThresholdValue,
+			&f.OccurrenceCount, &f.FirstSeenAt, &f.LastSeenAt); err != nil {
 			return nil, fmt.Errorf("failed to scan recent finding: %w", err)
 		}
 		findings = append(findings, f)
@@ -134,31 +208,37 @@ func GetRecentFindings(ctx context.Context, pool *pgxpool.Pool, databaseInstance
 }
 
 const listFindingsSQL = `
-	SELECT id::text, severity, category, title, message, recommendation, created_at
+	SELECT id::text, severity, category, title, message, recommendation, status,
+	       rule_key, resource_type, resource_name, current_value, threshold_value,
+	       occurrence_count, first_seen_at, last_seen_at
 	FROM findings
-	WHERE created_at >= $1
+	WHERE last_seen_at >= $1
 	  AND ($2 = '' OR database_instance_id = $2)
 	  AND ($3 = '' OR agent_id = $3)
 	  AND ($4 = '' OR severity = $4)
 	  AND ($5 = '' OR category = $5)
-	ORDER BY created_at DESC
-	LIMIT $6 OFFSET $7
+	  AND ($6 = '' OR status = $6)
+	ORDER BY last_seen_at DESC
+	LIMIT $7 OFFSET $8
 `
 
 // ListFindingsParams filters and paginates findings returned by
-// ListFindings and CountFindings.
+// ListFindings and CountFindings. Since filters on last_seen_at, and Status
+// filters on the finding's lifecycle status ("open" or "resolved"); an empty
+// Status matches both.
 type ListFindingsParams struct {
 	DatabaseInstanceID string
 	AgentID            string
 	Severity           string
 	Category           string
+	Status             string
 	Since              time.Time
 	Limit              int
 	Offset             int
 }
 
-// ListFindings returns a page of findings matching the given filters,
-// newest first.
+// ListFindings returns a page of findings matching the given filters, most
+// recently active first.
 func ListFindings(ctx context.Context, pool *pgxpool.Pool, params ListFindingsParams) ([]RecentFinding, error) {
 	rows, err := pool.Query(ctx, listFindingsSQL,
 		params.Since,
@@ -166,6 +246,7 @@ func ListFindings(ctx context.Context, pool *pgxpool.Pool, params ListFindingsPa
 		params.AgentID,
 		params.Severity,
 		params.Category,
+		params.Status,
 		params.Limit,
 		params.Offset,
 	)
@@ -177,7 +258,9 @@ func ListFindings(ctx context.Context, pool *pgxpool.Pool, params ListFindingsPa
 	findings := make([]RecentFinding, 0)
 	for rows.Next() {
 		var f RecentFinding
-		if err := rows.Scan(&f.ID, &f.Severity, &f.Category, &f.Title, &f.Message, &f.Recommendation, &f.DetectedAt); err != nil {
+		if err := rows.Scan(&f.ID, &f.Severity, &f.Category, &f.Title, &f.Message, &f.Recommendation, &f.Status,
+			&f.RuleKey, &f.ResourceType, &f.ResourceName, &f.CurrentValue, &f.ThresholdValue,
+			&f.OccurrenceCount, &f.FirstSeenAt, &f.LastSeenAt); err != nil {
 			return nil, fmt.Errorf("failed to scan finding: %w", err)
 		}
 		findings = append(findings, f)
@@ -193,11 +276,12 @@ func ListFindings(ctx context.Context, pool *pgxpool.Pool, params ListFindingsPa
 const countFindingsSQL = `
 	SELECT count(*)
 	FROM findings
-	WHERE created_at >= $1
+	WHERE last_seen_at >= $1
 	  AND ($2 = '' OR database_instance_id = $2)
 	  AND ($3 = '' OR agent_id = $3)
 	  AND ($4 = '' OR severity = $4)
 	  AND ($5 = '' OR category = $5)
+	  AND ($6 = '' OR status = $6)
 `
 
 // CountFindings returns the total number of findings matching the given
@@ -211,6 +295,7 @@ func CountFindings(ctx context.Context, pool *pgxpool.Pool, params ListFindingsP
 		params.AgentID,
 		params.Severity,
 		params.Category,
+		params.Status,
 	).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count findings: %w", err)
@@ -224,14 +309,15 @@ const countFindingsByCategoryTitleSQL = `
 	FROM findings
 	WHERE category = $1
 	  AND title ILIKE $2
-	  AND created_at >= $3
-	  AND created_at < $4
+	  AND first_seen_at >= $3
+	  AND first_seen_at < $4
 	  AND ($5 = '' OR database_instance_id = $5)
 	  AND ($6 = '' OR agent_id = $6)
 `
 
-// CountFindingsByCategoryTitle counts findings in [start, end) matching the
-// given category and a title pattern (using SQL ILIKE wildcards).
+// CountFindingsByCategoryTitle counts findings first detected in [start, end)
+// matching the given category and a title pattern (using SQL ILIKE
+// wildcards).
 func CountFindingsByCategoryTitle(ctx context.Context, pool *pgxpool.Pool, category, titlePattern, databaseInstanceID, agentID string, start, end time.Time) (int, error) {
 	var count int
 

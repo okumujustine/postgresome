@@ -145,7 +145,21 @@ type ingestFindingItem struct {
 	Title          string `json:"title"`
 	Message        string `json:"message"`
 	Recommendation string `json:"recommendation"`
+
+	RuleKey      string `json:"rule_key"`
+	ResourceType string `json:"resource_type"`
+	ResourceName string `json:"resource_name"`
+
+	CurrentValue   float64 `json:"current_value"`
+	ThresholdValue float64 `json:"threshold_value"`
 }
+
+// findingResolutionGracePeriod is how long an open finding may go
+// without being re-detected before it is automatically marked resolved.
+// It is roughly 3x the agent's default collection interval (30s), so a
+// single missed or delayed ingest cycle doesn't prematurely close an
+// issue that is still occurring.
+const findingResolutionGracePeriod = 90 * time.Second
 
 func (s *Server) handleIngestFindings(w http.ResponseWriter, r *http.Request) {
 	var req ingestFindingsRequest
@@ -159,38 +173,42 @@ func (s *Server) handleIngestFindings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(req.Findings) == 0 {
-		writeJSON(w, http.StatusOK, map[string]any{
-			"status":   "accepted",
-			"inserted": 0,
-		})
-		return
-	}
-
 	detectedAt := time.Now()
 
-	findings := make([]analysis.Finding, len(req.Findings))
-	for i, f := range req.Findings {
-		findings[i] = analysis.Finding{
-			DetectedAt:         detectedAt,
-			DatabaseInstanceID: req.DatabaseInstanceID,
-			AgentID:            req.AgentID,
-			Severity:           f.Severity,
-			Category:           f.Category,
-			Title:              f.Title,
-			Message:            f.Message,
-			Recommendation:     f.Recommendation,
+	if len(req.Findings) > 0 {
+		findings := make([]analysis.Finding, len(req.Findings))
+		for i, f := range req.Findings {
+			findings[i] = analysis.Finding{
+				DetectedAt:         detectedAt,
+				DatabaseInstanceID: req.DatabaseInstanceID,
+				AgentID:            req.AgentID,
+				Severity:           f.Severity,
+				Category:           f.Category,
+				Title:              f.Title,
+				Message:            f.Message,
+				Recommendation:     f.Recommendation,
+				RuleKey:            f.RuleKey,
+				ResourceType:       f.ResourceType,
+				ResourceName:       f.ResourceName,
+				CurrentValue:       f.CurrentValue,
+				ThresholdValue:     f.ThresholdValue,
+			}
+		}
+
+		if err := repository.UpsertFindings(r.Context(), s.pool, findings); err != nil {
+			http.Error(w, "failed to store findings", http.StatusInternalServerError)
+			return
 		}
 	}
 
-	if err := repository.InsertFindings(r.Context(), s.pool, findings); err != nil {
-		http.Error(w, "failed to store findings", http.StatusInternalServerError)
+	if err := repository.ResolveStaleFindings(r.Context(), s.pool, req.DatabaseInstanceID, detectedAt, findingResolutionGracePeriod); err != nil {
+		http.Error(w, "failed to resolve stale findings", http.StatusInternalServerError)
 		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"status":   "accepted",
-		"inserted": len(findings),
+		"inserted": len(req.Findings),
 	})
 }
 

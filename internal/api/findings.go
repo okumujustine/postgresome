@@ -91,10 +91,23 @@ func (s *Server) handleListFindings(w http.ResponseWriter, r *http.Request) {
 		agentID = dbInstance.AgentID
 	}
 
+	status := query.Get("status")
+	switch status {
+	case "":
+		status = "open"
+	case "all":
+		status = ""
+	case "open", "resolved":
+		// pass through as-is
+	default:
+		http.Error(w, "invalid status", http.StatusBadRequest)
+		return
+	}
+
 	since := time.Now().Add(-rangeDuration)
 	ctx := r.Context()
 
-	severityCounts, err := repository.CountFindingsBySeverity(ctx, s.pool, databaseInstanceID, agentID, since)
+	severityCounts, err := repository.CountFindingsBySeverity(ctx, s.pool, databaseInstanceID, agentID)
 	if err != nil {
 		log.Printf("failed to count findings by severity: %v", err)
 		http.Error(w, "failed to load findings", http.StatusInternalServerError)
@@ -106,6 +119,7 @@ func (s *Server) handleListFindings(w http.ResponseWriter, r *http.Request) {
 		AgentID:            agentID,
 		Severity:           query.Get("severity"),
 		Category:           query.Get("category"),
+		Status:             status,
 		Since:              since,
 		Limit:              limit,
 		Offset:             offset,
@@ -127,15 +141,7 @@ func (s *Server) handleListFindings(w http.ResponseWriter, r *http.Request) {
 
 	findingDTOs := make([]dashboardFindingDTO, len(findings))
 	for i, f := range findings {
-		findingDTOs[i] = dashboardFindingDTO{
-			ID:             f.ID,
-			Severity:       f.Severity,
-			Category:       f.Category,
-			Title:          f.Title,
-			Message:        f.Message,
-			Recommendation: f.Recommendation,
-			DetectedAt:     f.DetectedAt,
-		}
+		findingDTOs[i] = toDashboardFindingDTO(f)
 	}
 
 	instanceDTO := dashboardDatabaseInstanceDTO{

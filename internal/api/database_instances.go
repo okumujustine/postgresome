@@ -3,12 +3,9 @@ package api
 import (
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/okumujustine/postgresome/internal/storage/repository"
 )
-
-const databaseInstanceStatusWindow = time.Hour
 
 type listDatabaseInstancesResponse struct {
 	DatabaseInstances []dashboardDatabaseInstanceDTO `json:"database_instances"`
@@ -27,11 +24,9 @@ func (s *Server) handleListDatabaseInstances(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	since := time.Now().Add(-databaseInstanceStatusWindow)
-
 	dtos := make([]dashboardDatabaseInstanceDTO, len(instances))
 	for i, instance := range instances {
-		severityCounts, err := repository.CountFindingsBySeverity(ctx, s.pool, instance.ID, instance.AgentID, since)
+		severityCounts, err := repository.CountFindingsBySeverity(ctx, s.pool, instance.ID, instance.AgentID)
 		if err != nil {
 			log.Printf("failed to count findings for %s: %v", instance.ID, err)
 			http.Error(w, "failed to list database instances", http.StatusInternalServerError)

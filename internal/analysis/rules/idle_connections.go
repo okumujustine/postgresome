@@ -59,6 +59,10 @@ func (r IdleConnectionRule) Analyze(snapshot metrics.DatabaseActivitySnapshot) [
 			Title:              "Critical idle connection pressure detected",
 			Message:            "Most database sessions are idle or several sessions are idle in transaction.",
 			Recommendation:     "Investigate connection leaks, idle transactions, and application pool configuration immediately.",
+			RuleKey:            r.Name(),
+			ResourceType:       "database",
+			CurrentValue:       idlePercentage,
+			ThresholdValue:     idleConnectionsCriticalRatio,
 		}}
 
 	case idlePercentage >= idleConnectionsWarningRatio || idleInTransaction > 0:
@@ -70,6 +74,10 @@ func (r IdleConnectionRule) Analyze(snapshot metrics.DatabaseActivitySnapshot) [
 			Title:              "High idle connection usage detected",
 			Message:            "A large percentage of database sessions are idle.",
 			Recommendation:     "Review application connection pooling and check whether connections are being held longer than necessary.",
+			RuleKey:            r.Name(),
+			ResourceType:       "database",
+			CurrentValue:       idlePercentage,
+			ThresholdValue:     idleConnectionsWarningRatio,
 		}}
 
 	default:

@@ -1,4 +1,4 @@
-import { AlertTriangle, LayoutDashboard, LineChart, Table2, Terminal } from 'lucide-react';
+import { AlertTriangle, HeartPulse, LayoutDashboard, LineChart, Table2, Terminal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
@@ -9,14 +9,14 @@ interface NavItem {
   end: boolean;
 }
 
-const MONITORING_ITEMS: NavItem[] = [
-  { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
+const DATABASE_ITEMS: NavItem[] = [
+  { to: '/', label: 'Health', icon: HeartPulse, end: true },
   { to: '/issues', label: 'Issues', icon: AlertTriangle, end: false },
   { to: '/queries', label: 'Queries', icon: Terminal, end: false },
   { to: '/tables', label: 'Tables', icon: Table2, end: false },
 ];
 
-const ADVANCED_ITEMS: NavItem[] = [
+const ANALYZE_ITEMS: NavItem[] = [
   { to: '/metrics', label: 'Metrics', icon: LineChart, end: false },
 ];
 
@@ -91,8 +91,8 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-[18px] overflow-y-auto p-3">
-        <NavSection title="Monitoring" items={MONITORING_ITEMS} />
-        <NavSection title="Advanced" items={ADVANCED_ITEMS} />
+        <NavSection title="Database" items={DATABASE_ITEMS} />
+        <NavSection title="Analyze" items={ANALYZE_ITEMS} />
       </nav>
     </aside>
   );

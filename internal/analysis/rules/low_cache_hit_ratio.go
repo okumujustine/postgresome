@@ -41,6 +41,10 @@ func (r LowCacheHitRatioRule) Analyze(stats metrics.DatabaseStats, delta metrics
 			Title:              "Low cache hit ratio detected",
 			Message:            fmt.Sprintf("PostgreSQL is reading frequently from disk. Current cache hit ratio is %.1f%%.", ratio*100),
 			Recommendation:     "Investigate missing indexes, inefficient queries, and shared_buffers configuration.",
+			RuleKey:            r.Name(),
+			ResourceType:       "database",
+			CurrentValue:       ratio,
+			ThresholdValue:     lowCacheHitRatioCriticalThreshold,
 		}}
 
 	case ratio < lowCacheHitRatioWarningThreshold:
@@ -52,6 +56,10 @@ func (r LowCacheHitRatioRule) Analyze(stats metrics.DatabaseStats, delta metrics
 			Title:              "Reduced cache efficiency detected",
 			Message:            fmt.Sprintf("PostgreSQL cache hit ratio is currently %.1f%%.", ratio*100),
 			Recommendation:     "Review query patterns, indexes, and memory configuration.",
+			RuleKey:            r.Name(),
+			ResourceType:       "database",
+			CurrentValue:       ratio,
+			ThresholdValue:     lowCacheHitRatioWarningThreshold,
 		}}
 
 	default:
