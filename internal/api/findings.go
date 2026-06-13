@@ -71,28 +71,24 @@ func (s *Server) handleListFindings(w http.ResponseWriter, r *http.Request) {
 
 	agentID := query.Get("agent_id")
 	databaseInstanceID := query.Get("database_instance_id")
-
-	var (
-		dbInstance *repository.DatabaseInstance
-		err        error
-	)
-
-	if databaseInstanceID != "" {
-		dbInstance, err = repository.GetDatabaseInstance(r.Context(), s.pool, databaseInstanceID)
-	} else {
-		dbInstance, err = repository.GetMostRecentDatabaseInstance(r.Context(), s.pool)
+	if databaseInstanceID == "" {
+		http.Error(w, "database_instance_id is required", http.StatusBadRequest)
+		return
 	}
+
+	dbInstance, err := repository.GetDatabaseInstance(r.Context(), s.pool, databaseInstanceID)
 	if err != nil {
 		log.Printf("failed to load database instance: %v", err)
 		http.Error(w, "failed to load findings", http.StatusInternalServerError)
 		return
 	}
+	if dbInstance == nil {
+		http.Error(w, "database instance not found", http.StatusNotFound)
+		return
+	}
 
-	if dbInstance != nil {
-		databaseInstanceID = dbInstance.ID
-		if agentID == "" {
-			agentID = dbInstance.AgentID
-		}
+	if agentID == "" {
+		agentID = dbInstance.AgentID
 	}
 
 	since := time.Now().Add(-rangeDuration)
@@ -142,14 +138,11 @@ func (s *Server) handleListFindings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	instanceDTO := dashboardDatabaseInstanceDTO{Status: "unknown"}
-	if dbInstance != nil {
-		instanceDTO = dashboardDatabaseInstanceDTO{
-			ID:           dbInstance.ID,
-			DatabaseName: dbInstance.Name,
-			Host:         dbInstance.Host,
-			Status:       dashboardInstanceStatus(severityCounts),
-		}
+	instanceDTO := dashboardDatabaseInstanceDTO{
+		ID:           dbInstance.ID,
+		DatabaseName: dbInstance.Name,
+		Host:         dbInstance.Host,
+		Status:       dashboardInstanceStatus(severityCounts),
 	}
 
 	writeJSON(w, http.StatusOK, findingsListResponse{

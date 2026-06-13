@@ -13,6 +13,7 @@ import (
 	"github.com/okumujustine/postgresome/internal/analysis/rules"
 	"github.com/okumujustine/postgresome/internal/collector"
 	"github.com/okumujustine/postgresome/internal/collector/activity"
+	"github.com/okumujustine/postgresome/internal/collector/explain"
 	"github.com/okumujustine/postgresome/internal/collector/extensions"
 	"github.com/okumujustine/postgresome/internal/collector/queries"
 	"github.com/okumujustine/postgresome/internal/collector/tables"
@@ -65,6 +66,7 @@ func (r *Runner) Start(ctx context.Context) error {
 	tableStatsCollector := tables.NewTableStatsCollector(pool)
 	extensionCollector := extensions.NewExtensionCollector(pool)
 	queryStatsCollector := queries.NewQueryStatsCollector(pool)
+	explainCollector := explain.NewExplainCollector(pool)
 
 	info, err := postgresCollector.GetDatabaseInfo(ctx)
 	if err != nil {
@@ -88,6 +90,19 @@ func (r *Runner) Start(ctx context.Context) error {
 		fmt.Println("pg_stat_statements not enabled - skipping query analysis")
 	}
 
+	explainAnalysisEnabled := false
+	if pgStatStatementsEnabled {
+		probeCtx, probeCancel := context.WithTimeout(ctx, 5*time.Second)
+		explainAnalysisEnabled = explainCollector.ProbeGenericPlanSupport(probeCtx)
+		probeCancel()
+
+		if explainAnalysisEnabled {
+			fmt.Println("EXPLAIN analysis enabled (GENERIC_PLAN supported)")
+		} else {
+			fmt.Println("EXPLAIN analysis unavailable (requires PostgreSQL 16+) - skipping")
+		}
+	}
+
 	fmt.Printf("Collection interval: %s\n", r.cfg.Interval)
 
 	ticker := time.NewTicker(r.cfg.Interval)
@@ -98,6 +113,7 @@ func (r *Runner) Start(ctx context.Context) error {
 	engine.RegisterActivityRules(rules.IdleConnectionRule{}, rules.LongRunningQueryRule{}, rules.BlockedQueryRule{})
 	engine.RegisterTableRules(rules.AutovacuumLagRule{}, rules.HighSequentialScanRule{})
 	engine.RegisterQueryRules(rules.SlowQueryRule{}, rules.ExpensiveQueryRule{}, rules.DiskHeavyQueryRule{})
+	engine.RegisterExplainRules(rules.MissingIndexRule{}, rules.ExpensiveSortRule{})
 
 	var previousStats *metrics.DatabaseStats
 
@@ -165,6 +181,17 @@ func (r *Runner) Start(ctx context.Context) error {
 				}
 			}
 
+			var explainSnapshot *metrics.ExplainSnapshot
+
+			if explainAnalysisEnabled && queryStatsSnapshot != nil {
+				explainCtx, explainCancel := context.WithTimeout(ctx, 10*time.Second)
+				snapshot := explainCollector.GetExplainPlans(explainCtx, *queryStatsSnapshot, stats.DatabaseName)
+				explainCancel()
+
+				snapshot.DatabaseInstanceID = stats.DatabaseName
+				explainSnapshot = snapshot
+			}
+
 			collectedAt := time.Now()
 
 			dimensions := map[string]string{
@@ -219,6 +246,10 @@ func (r *Runner) Start(ctx context.Context) error {
 				findings = append(findings, engine.AnalyzeQueryStats(*queryStatsSnapshot)...)
 			}
 
+			if explainSnapshot != nil {
+				findings = append(findings, engine.AnalyzeExplainPlans(*explainSnapshot)...)
+			}
+
 			for i := range findings {
 				findings[i].AgentID = r.cfg.AgentID
 				findings[i].DatabaseInstanceID = r.cfg.DatabaseInstanceID
@@ -270,14 +301,21 @@ func (r *Runner) Start(ctx context.Context) error {
 				queriesAnalyzed = len(queryStatsSnapshot.Queries)
 			}
 
+			plansAnalyzed := 0
+			if explainSnapshot != nil {
+				plansAnalyzed = len(explainSnapshot.Plans)
+			}
+
 			printCollectionSummary(collectionSummary{
-				DatabaseName:        stats.DatabaseName,
-				MetricsSent:         metricsSent,
-				FindingsSent:        findingsSent,
-				ActivitySessions:    activitySessions,
-				TablesAnalyzed:      tablesAnalyzed,
-				QueriesAnalyzed:     queriesAnalyzed,
-				QueryAnalysisActive: pgStatStatementsEnabled,
+				DatabaseName:          stats.DatabaseName,
+				MetricsSent:           metricsSent,
+				FindingsSent:          findingsSent,
+				ActivitySessions:      activitySessions,
+				TablesAnalyzed:        tablesAnalyzed,
+				QueriesAnalyzed:       queriesAnalyzed,
+				QueryAnalysisActive:   pgStatStatementsEnabled,
+				PlansAnalyzed:         plansAnalyzed,
+				ExplainAnalysisActive: explainAnalysisEnabled,
 			})
 
 			if len(findings) > 0 {
@@ -455,13 +493,15 @@ func previewQuery(query string, maxLength int) string {
 // collectionSummary holds the counts reported at the end of a collection
 // cycle.
 type collectionSummary struct {
-	DatabaseName        string
-	MetricsSent         int
-	FindingsSent        int
-	ActivitySessions    int
-	TablesAnalyzed      int
-	QueriesAnalyzed     int
-	QueryAnalysisActive bool
+	DatabaseName          string
+	MetricsSent           int
+	FindingsSent          int
+	ActivitySessions      int
+	TablesAnalyzed        int
+	QueriesAnalyzed       int
+	QueryAnalysisActive   bool
+	PlansAnalyzed         int
+	ExplainAnalysisActive bool
 }
 
 func printCollectionSummary(s collectionSummary) {
@@ -473,6 +513,9 @@ func printCollectionSummary(s collectionSummary) {
 	fmt.Printf("- Tables analyzed: %d\n", s.TablesAnalyzed)
 	if s.QueryAnalysisActive {
 		fmt.Printf("- Queries analyzed: %d\n", s.QueriesAnalyzed)
+	}
+	if s.ExplainAnalysisActive {
+		fmt.Printf("- Plans analyzed: %d\n", s.PlansAnalyzed)
 	}
 }
 

@@ -6,19 +6,21 @@ import type { QueryStatsResponse } from '../types/queries';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
 import { formatDuration, formatRelativeTime } from '../lib/format';
+import { useDatabaseInstance } from '../lib/databaseInstance';
 
 export function QueriesPage() {
   const [data, setData] = useState<QueryStatsResponse | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { selectedId, loading: instanceLoading } = useDatabaseInstance();
 
-  const load = useCallback(async (isRefresh: boolean) => {
+  const load = useCallback(async (databaseInstanceId: string, isRefresh: boolean) => {
     if (isRefresh) {
       setRefreshing(true);
     }
 
     try {
-      const result = await getQueryStats({});
+      const result = await getQueryStats({ databaseInstanceId });
       setData(result);
       setError(null);
     } catch (err) {
@@ -33,23 +35,20 @@ export function QueriesPage() {
   }, []);
 
   useEffect(() => {
+    if (instanceLoading || !selectedId) return;
     // load() only updates state after its internal await, not synchronously.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load(false);
-  }, [load]);
+    load(selectedId, false);
+  }, [selectedId, instanceLoading, load]);
 
   const loading = data === null && error === null;
 
-  const instance = data?.database_instance ?? { id: '', database_name: '', host: '', status: 'unknown' };
-  const hasInstance = Boolean(data?.database_instance?.id);
   const queries = data?.queries ?? [];
 
   return (
     <Layout
       title="Queries"
-      databaseName={hasInstance ? instance.database_name : undefined}
-      status={instance.status}
-      onRefresh={() => load(true)}
+      onRefresh={() => load(selectedId, true)}
       refreshing={refreshing}
     >
       {error && (

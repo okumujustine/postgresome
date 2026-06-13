@@ -84,9 +84,15 @@ func (s *Server) handleQueryMetrics(w http.ResponseWriter, r *http.Request) {
 		limit = parsed
 	}
 
+	databaseInstanceID := query.Get("database_instance_id")
+	if databaseInstanceID == "" {
+		http.Error(w, "database_instance_id is required", http.StatusBadRequest)
+		return
+	}
+
 	points, err := repository.QueryMetricPoints(r.Context(), s.pool, repository.MetricQueryParams{
 		MetricKey:          metricKey,
-		DatabaseInstanceID: query.Get("database_instance_id"),
+		DatabaseInstanceID: databaseInstanceID,
 		AgentID:            query.Get("agent_id"),
 		Since:              time.Now().Add(-rangeDuration),
 		BucketInterval:     bucketInterval,

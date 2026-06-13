@@ -35,12 +35,21 @@ type QueryRule interface {
 	Analyze(snapshot metrics.QueryStatsSnapshot) []Finding
 }
 
+// ExplainRule inspects a snapshot of EXPLAIN plans for the top queries and
+// reports zero or more findings. Concrete rules are implemented in
+// internal/analysis/rules and satisfy this interface structurally.
+type ExplainRule interface {
+	Name() string
+	Analyze(snapshot metrics.ExplainSnapshot) []Finding
+}
+
 // Engine runs a set of rules against collected metrics to produce findings.
 type Engine struct {
 	metricRules   []MetricRule
 	activityRules []ActivityRule
 	tableRules    []TableRule
 	queryRules    []QueryRule
+	explainRules  []ExplainRule
 }
 
 func NewEngine() *Engine {
@@ -107,6 +116,24 @@ func (e *Engine) AnalyzeQueryStats(snapshot metrics.QueryStatsSnapshot) []Findin
 	findings := make([]Finding, 0)
 
 	for _, rule := range e.queryRules {
+		findings = append(findings, rule.Analyze(snapshot)...)
+	}
+
+	return findings
+}
+
+// RegisterExplainRules adds rules that analyze EXPLAIN plans for the top
+// queries.
+func (e *Engine) RegisterExplainRules(explainRules ...ExplainRule) {
+	e.explainRules = append(e.explainRules, explainRules...)
+}
+
+// AnalyzeExplainPlans runs all registered explain rules against a snapshot
+// of EXPLAIN plans.
+func (e *Engine) AnalyzeExplainPlans(snapshot metrics.ExplainSnapshot) []Finding {
+	findings := make([]Finding, 0)
+
+	for _, rule := range e.explainRules {
 		findings = append(findings, rule.Analyze(snapshot)...)
 	}
 

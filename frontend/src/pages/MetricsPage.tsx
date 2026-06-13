@@ -8,6 +8,7 @@ import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
 import { MetricCard } from '../components/MetricCard';
 import { LineChart } from '../components/LineChart';
+import { useDatabaseInstance } from '../lib/databaseInstance';
 
 function formatMetricValue(value: number, unit: string): string {
   if (unit === 'percent') {
@@ -34,16 +35,17 @@ export function MetricsPage() {
   const [charts, setCharts] = useState<Record<string, MetricQueryResponse>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { selectedId, loading: instanceLoading } = useDatabaseInstance();
 
-  const load = useCallback(async (currentRange: MetricRange, isRefresh: boolean) => {
+  const load = useCallback(async (currentRange: MetricRange, databaseInstanceId: string, isRefresh: boolean) => {
     if (isRefresh) {
       setRefreshing(true);
     }
 
     try {
       const [overviewResult, ...chartResults] = await Promise.all([
-        getDashboardOverview({ range: currentRange }),
-        ...CHART_METRICS.map((m) => queryMetrics({ metricKey: m.key, range: currentRange })),
+        getDashboardOverview({ range: currentRange, databaseInstanceId }),
+        ...CHART_METRICS.map((m) => queryMetrics({ metricKey: m.key, range: currentRange, databaseInstanceId })),
       ]);
 
       const chartMap: Record<string, MetricQueryResponse> = {};
@@ -66,25 +68,22 @@ export function MetricsPage() {
   }, []);
 
   useEffect(() => {
+    if (instanceLoading || !selectedId) return;
     // load() only updates state after its internal await, not synchronously.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load(range, false);
-  }, [range, load]);
+    load(range, selectedId, false);
+  }, [range, selectedId, instanceLoading, load]);
 
   const loading = overview === null && error === null;
 
   const summary = overview?.summary;
-  const instance = overview?.database_instance ?? { id: '', database_name: '', host: '', status: 'unknown' };
-  const hasInstance = Boolean(overview?.database_instance?.id);
 
   return (
     <Layout
       title="Metrics"
-      databaseName={hasInstance ? instance.database_name : undefined}
-      status={instance.status}
       range={range}
       onRangeChange={setRange}
-      onRefresh={() => load(range, true)}
+      onRefresh={() => load(range, selectedId, true)}
       refreshing={refreshing}
     >
       {error && (

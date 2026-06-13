@@ -9,6 +9,10 @@ export interface DashboardInstance {
   status: InstanceStatus | string;
 }
 
+export interface DatabaseInstancesResponse {
+  database_instances: DashboardInstance[];
+}
+
 export interface DashboardMetric {
   value: number;
   unit: string;

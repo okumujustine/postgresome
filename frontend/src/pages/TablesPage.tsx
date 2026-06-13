@@ -6,6 +6,7 @@ import type { TableStat, TableStatsResponse } from '../types/tables';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
 import { formatRelativeTime } from '../lib/format';
+import { useDatabaseInstance } from '../lib/databaseInstance';
 
 const DEAD_ROW_WARNING_RATIO = 20;
 
@@ -19,14 +20,15 @@ export function TablesPage() {
   const [data, setData] = useState<TableStatsResponse | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { selectedId, loading: instanceLoading } = useDatabaseInstance();
 
-  const load = useCallback(async (isRefresh: boolean) => {
+  const load = useCallback(async (databaseInstanceId: string, isRefresh: boolean) => {
     if (isRefresh) {
       setRefreshing(true);
     }
 
     try {
-      const result = await getTableStats({});
+      const result = await getTableStats({ databaseInstanceId });
       setData(result);
       setError(null);
     } catch (err) {
@@ -41,23 +43,20 @@ export function TablesPage() {
   }, []);
 
   useEffect(() => {
+    if (instanceLoading || !selectedId) return;
     // load() only updates state after its internal await, not synchronously.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load(false);
-  }, [load]);
+    load(selectedId, false);
+  }, [selectedId, instanceLoading, load]);
 
   const loading = data === null && error === null;
 
-  const instance = data?.database_instance ?? { id: '', database_name: '', host: '', status: 'unknown' };
-  const hasInstance = Boolean(data?.database_instance?.id);
   const tables = data?.tables ?? [];
 
   return (
     <Layout
       title="Tables"
-      databaseName={hasInstance ? instance.database_name : undefined}
-      status={instance.status}
-      onRefresh={() => load(true)}
+      onRefresh={() => load(selectedId, true)}
       refreshing={refreshing}
     >
       {error && (

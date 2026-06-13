@@ -42,3 +42,12 @@ type QueryRule interface {
 	Name() string
 	Analyze(snapshot metrics.QueryStatsSnapshot) []analysis.Finding
 }
+
+// ExplainRule inspects a snapshot of EXPLAIN plans for the top queries and
+// reports zero or more findings. Implementations satisfy
+// analysis.ExplainRule and can be registered with an analysis.Engine via
+// RegisterExplainRules.
+type ExplainRule interface {
+	Name() string
+	Analyze(snapshot metrics.ExplainSnapshot) []analysis.Finding
+}

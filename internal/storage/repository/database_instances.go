@@ -43,27 +43,34 @@ func GetDatabaseInstance(ctx context.Context, pool *pgxpool.Pool, id string) (*D
 	return &instance, nil
 }
 
-const getMostRecentDatabaseInstanceSQL = `
+const listDatabaseInstancesSQL = `
 	SELECT id, agent_id, name, host, created_at
 	FROM database_instances
-	ORDER BY created_at DESC
-	LIMIT 1
+	ORDER BY name ASC
 `
 
-// GetMostRecentDatabaseInstance returns the most recently registered database
-// instance, or nil if none are registered yet.
-func GetMostRecentDatabaseInstance(ctx context.Context, pool *pgxpool.Pool) (*DatabaseInstance, error) {
-	var instance DatabaseInstance
-
-	err := pool.QueryRow(ctx, getMostRecentDatabaseInstanceSQL).Scan(
-		&instance.ID, &instance.AgentID, &instance.Name, &instance.Host, &instance.CreatedAt,
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
+// ListDatabaseInstances returns every registered database instance, ordered
+// by name, for use in a database selector UI.
+func ListDatabaseInstances(ctx context.Context, pool *pgxpool.Pool) ([]DatabaseInstance, error) {
+	rows, err := pool.Query(ctx, listDatabaseInstancesSQL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get most recent database instance: %w", err)
+		return nil, fmt.Errorf("failed to list database instances: %w", err)
+	}
+	defer rows.Close()
+
+	instances := make([]DatabaseInstance, 0)
+
+	for rows.Next() {
+		var instance DatabaseInstance
+		if err := rows.Scan(&instance.ID, &instance.AgentID, &instance.Name, &instance.Host, &instance.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan database instance: %w", err)
+		}
+		instances = append(instances, instance)
 	}
 
-	return &instance, nil
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read database instances: %w", err)
+	}
+
+	return instances, nil
 }

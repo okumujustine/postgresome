@@ -6,6 +6,7 @@ import type { FindingsListResponse, MetricRange } from '../types/dashboard';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
 import { FindingCard } from '../components/FindingCard';
+import { useDatabaseInstance } from '../lib/databaseInstance';
 
 const PAGE_SIZE = 20;
 
@@ -24,6 +25,7 @@ const CATEGORY_OPTIONS = [
   { value: 'locks', label: 'Locks' },
   { value: 'transactions', label: 'Transactions' },
   { value: 'cache', label: 'Cache' },
+  { value: 'query_plan', label: 'Query Plan' },
 ];
 
 function FilterSelect({
@@ -64,9 +66,17 @@ export function IssuesPage() {
   const [data, setData] = useState<FindingsListResponse | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { selectedId, loading: instanceLoading } = useDatabaseInstance();
 
   const load = useCallback(
-    async (currentRange: MetricRange, currentSeverity: string, currentCategory: string, currentOffset: number, isRefresh: boolean) => {
+    async (
+      currentRange: MetricRange,
+      currentSeverity: string,
+      currentCategory: string,
+      currentOffset: number,
+      databaseInstanceId: string,
+      isRefresh: boolean,
+    ) => {
       if (isRefresh) {
         setRefreshing(true);
       }
@@ -78,6 +88,7 @@ export function IssuesPage() {
           category: currentCategory || undefined,
           limit: PAGE_SIZE,
           offset: currentOffset,
+          databaseInstanceId,
         });
         setData(result);
         setError(null);
@@ -95,14 +106,14 @@ export function IssuesPage() {
   );
 
   useEffect(() => {
+    if (instanceLoading || !selectedId) return;
     // load() only updates state after its internal await, not synchronously.
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load(range, severity, category, offset, false);
-  }, [range, severity, category, offset, load]);
+    load(range, severity, category, offset, selectedId, false);
+  }, [range, severity, category, offset, selectedId, instanceLoading, load]);
 
   const loading = data === null && error === null;
 
-  const instance = data?.database_instance ?? { id: '', database_name: '', host: '', status: 'unknown' };
   const counts = data?.severity_counts ?? { critical: 0, warning: 0, info: 0 };
   const findings = data?.findings ?? [];
   const total = data?.total ?? 0;
@@ -113,14 +124,12 @@ export function IssuesPage() {
   return (
     <Layout
       title="Issues"
-      databaseName={data?.database_instance?.id ? instance.database_name : undefined}
-      status={instance.status}
       range={range}
       onRangeChange={(value) => {
         setRange(value);
         setOffset(0);
       }}
-      onRefresh={() => load(range, severity, category, offset, true)}
+      onRefresh={() => load(range, severity, category, offset, selectedId, true)}
       refreshing={refreshing}
     >
       {error && (
