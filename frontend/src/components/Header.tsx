@@ -15,8 +15,8 @@ export interface HeaderProps {
   title: string;
   databaseName?: string;
   status?: InstanceStatus | string;
-  range: MetricRange;
-  onRangeChange: (range: MetricRange) => void;
+  range?: MetricRange;
+  onRangeChange?: (range: MetricRange) => void;
   onRefresh: () => void;
   refreshing: boolean;
   onHamburger: () => void;
@@ -60,23 +60,25 @@ export function Header({ title, databaseName, status, range, onRangeChange, onRe
 
       <div className="flex-1" />
 
-      <div className="relative inline-block">
-        <select
-          value={range}
-          onChange={(event) => onRangeChange(event.target.value as MetricRange)}
-          className="h-[var(--control-h-sm)] cursor-pointer appearance-none rounded-[var(--radius-md)] border pr-8 pl-3 text-[13px] outline-none"
-          style={{ background: 'var(--surface-raised)', color: 'var(--text-primary)', borderColor: 'var(--border-default)', fontFamily: 'var(--font-sans)' }}
-        >
-          {RANGE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value} style={{ background: 'var(--surface-card)', color: 'var(--text-primary)' }}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <span className="pointer-events-none absolute right-[11px] top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
-          <ChevronDown size={14} />
-        </span>
-      </div>
+      {range && onRangeChange && (
+        <div className="relative inline-block">
+          <select
+            value={range}
+            onChange={(event) => onRangeChange(event.target.value as MetricRange)}
+            className="h-[var(--control-h-sm)] cursor-pointer appearance-none rounded-[var(--radius-md)] border pr-8 pl-3 text-[13px] outline-none"
+            style={{ background: 'var(--surface-raised)', color: 'var(--text-primary)', borderColor: 'var(--border-default)', fontFamily: 'var(--font-sans)' }}
+          >
+            {RANGE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value} style={{ background: 'var(--surface-card)', color: 'var(--text-primary)' }}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <span className="pointer-events-none absolute right-[11px] top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
+            <ChevronDown size={14} />
+          </span>
+        </div>
+      )}
 
       <button
         onClick={onRefresh}

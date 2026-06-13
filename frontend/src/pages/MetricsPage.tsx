@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Activity, Database, RotateCcw, Search, Server } from 'lucide-react';
+import { Activity, Database, RotateCcw, Search } from 'lucide-react';
 import { getDashboardOverview } from '../api/dashboard';
+import { queryMetrics } from '../api/metrics';
 import { ApiError } from '../api/client';
-import type { DashboardInstance, DashboardOverview, MetricRange } from '../types/dashboard';
+import type { DashboardOverview, MetricQueryResponse, MetricRange } from '../types/dashboard';
 import { Layout } from '../components/Layout';
+import { Card } from '../components/Card';
 import { MetricCard } from '../components/MetricCard';
-import { FindingsList } from '../components/FindingsList';
+import { LineChart } from '../components/LineChart';
 
 function formatMetricValue(value: number, unit: string): string {
   if (unit === 'percent') {
@@ -18,40 +20,18 @@ function metricUnitLabel(unit: string): string {
   return unit === 'percent' ? '%' : '';
 }
 
-function InstanceHeader({ instance }: { instance: DashboardInstance }) {
-  const hasInstance = Boolean(instance.id);
+const CHART_METRICS: { key: string; label: string; color: string }[] = [
+  { key: 'active_connections', label: 'Active connections', color: 'var(--viz-1)' },
+  { key: 'transaction_commits', label: 'Transaction commits', color: 'var(--viz-2)' },
+  { key: 'transaction_rollbacks', label: 'Transaction rollbacks', color: 'var(--viz-5)' },
+  { key: 'blocks_hit_in_cache', label: 'Blocks hit in cache', color: 'var(--viz-6)' },
+  { key: 'blocks_read_from_disk', label: 'Blocks read from disk', color: 'var(--viz-3)' },
+];
 
-  return (
-    <div className="mb-[22px] flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <div className="mb-[9px] flex items-center gap-3">
-          <h2
-            className="m-0 text-[var(--fs-h1)] font-semibold"
-            style={{ color: 'var(--text-primary)', letterSpacing: 'var(--ls-tight)', fontFamily: 'var(--font-mono)' }}
-          >
-            {hasInstance ? instance.database_name : 'No database instance'}
-          </h2>
-        </div>
-        {hasInstance && (
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="inline-flex items-center gap-[6px] text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
-              <Server size={13} />
-              <span style={{ fontFamily: 'var(--font-mono)' }}>{instance.host}</span>
-            </span>
-            <span className="inline-flex items-center gap-[6px] text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
-              <Database size={13} />
-              <span style={{ fontFamily: 'var(--font-mono)' }}>{instance.id}</span>
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-export function DashboardPage() {
+export function MetricsPage() {
   const [range, setRange] = useState<MetricRange>('1h');
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
+  const [charts, setCharts] = useState<Record<string, MetricQueryResponse>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,8 +41,18 @@ export function DashboardPage() {
     }
 
     try {
-      const data = await getDashboardOverview({ range: currentRange });
-      setOverview(data);
+      const [overviewResult, ...chartResults] = await Promise.all([
+        getDashboardOverview({ range: currentRange }),
+        ...CHART_METRICS.map((m) => queryMetrics({ metricKey: m.key, range: currentRange })),
+      ]);
+
+      const chartMap: Record<string, MetricQueryResponse> = {};
+      CHART_METRICS.forEach((m, i) => {
+        chartMap[m.key] = chartResults[i];
+      });
+
+      setOverview(overviewResult);
+      setCharts(chartMap);
       setError(null);
     } catch (err) {
       const message =
@@ -84,13 +74,13 @@ export function DashboardPage() {
   const loading = overview === null && error === null;
 
   const summary = overview?.summary;
-  const findings = overview?.findings;
   const instance = overview?.database_instance ?? { id: '', database_name: '', host: '', status: 'unknown' };
+  const hasInstance = Boolean(overview?.database_instance?.id);
 
   return (
     <Layout
-      title="Overview"
-      databaseName={overview?.database_instance?.id ? instance.database_name : undefined}
+      title="Metrics"
+      databaseName={hasInstance ? instance.database_name : undefined}
       status={instance.status}
       range={range}
       onRangeChange={setRange}
@@ -100,7 +90,7 @@ export function DashboardPage() {
       {error && (
         <div
           className="mb-6 rounded-[var(--radius-lg)] border px-4 py-3 text-sm"
-          style={{ borderColor: 'rgba(248,81,73,0.32)', background: 'var(--danger-tint)', color: '#FF9892' }}
+          style={{ borderColor: 'rgba(207,34,46,0.25)', background: 'var(--danger-tint)', color: 'var(--danger)' }}
         >
           {error}
         </div>
@@ -109,12 +99,10 @@ export function DashboardPage() {
       {loading && !overview ? (
         <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
           <Search size={14} className="animate-pulse" />
-          Loading dashboard…
+          Loading metrics…
         </div>
       ) : overview ? (
         <>
-          <InstanceHeader instance={instance} />
-
           <div className="mb-6 grid gap-[14px]" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
             <MetricCard
               label="Active connections"
@@ -149,7 +137,13 @@ export function DashboardPage() {
             />
           </div>
 
-          <FindingsList findings={findings!} />
+          <div className="grid gap-[14px]" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+            {CHART_METRICS.map((m) => (
+              <Card key={m.key} title={m.label}>
+                <LineChart data={charts[m.key]?.points ?? []} color={m.color} />
+              </Card>
+            ))}
+          </div>
         </>
       ) : null}
     </Layout>

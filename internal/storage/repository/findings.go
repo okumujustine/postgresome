@@ -133,6 +133,92 @@ func GetRecentFindings(ctx context.Context, pool *pgxpool.Pool, databaseInstance
 	return findings, nil
 }
 
+const listFindingsSQL = `
+	SELECT id::text, severity, category, title, message, recommendation, created_at
+	FROM findings
+	WHERE created_at >= $1
+	  AND ($2 = '' OR database_instance_id = $2)
+	  AND ($3 = '' OR agent_id = $3)
+	  AND ($4 = '' OR severity = $4)
+	  AND ($5 = '' OR category = $5)
+	ORDER BY created_at DESC
+	LIMIT $6 OFFSET $7
+`
+
+// ListFindingsParams filters and paginates findings returned by
+// ListFindings and CountFindings.
+type ListFindingsParams struct {
+	DatabaseInstanceID string
+	AgentID            string
+	Severity           string
+	Category           string
+	Since              time.Time
+	Limit              int
+	Offset             int
+}
+
+// ListFindings returns a page of findings matching the given filters,
+// newest first.
+func ListFindings(ctx context.Context, pool *pgxpool.Pool, params ListFindingsParams) ([]RecentFinding, error) {
+	rows, err := pool.Query(ctx, listFindingsSQL,
+		params.Since,
+		params.DatabaseInstanceID,
+		params.AgentID,
+		params.Severity,
+		params.Category,
+		params.Limit,
+		params.Offset,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query findings: %w", err)
+	}
+	defer rows.Close()
+
+	findings := make([]RecentFinding, 0)
+	for rows.Next() {
+		var f RecentFinding
+		if err := rows.Scan(&f.ID, &f.Severity, &f.Category, &f.Title, &f.Message, &f.Recommendation, &f.DetectedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan finding: %w", err)
+		}
+		findings = append(findings, f)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read findings: %w", err)
+	}
+
+	return findings, nil
+}
+
+const countFindingsSQL = `
+	SELECT count(*)
+	FROM findings
+	WHERE created_at >= $1
+	  AND ($2 = '' OR database_instance_id = $2)
+	  AND ($3 = '' OR agent_id = $3)
+	  AND ($4 = '' OR severity = $4)
+	  AND ($5 = '' OR category = $5)
+`
+
+// CountFindings returns the total number of findings matching the given
+// filters, ignoring Limit and Offset.
+func CountFindings(ctx context.Context, pool *pgxpool.Pool, params ListFindingsParams) (int, error) {
+	var count int
+
+	err := pool.QueryRow(ctx, countFindingsSQL,
+		params.Since,
+		params.DatabaseInstanceID,
+		params.AgentID,
+		params.Severity,
+		params.Category,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count findings: %w", err)
+	}
+
+	return count, nil
+}
+
 const countFindingsByCategoryTitleSQL = `
 	SELECT count(*)
 	FROM findings

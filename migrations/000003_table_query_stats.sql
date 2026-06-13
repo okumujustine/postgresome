@@ -1,0 +1,50 @@
+CREATE TABLE IF NOT EXISTS table_stats (
+    id BIGSERIAL PRIMARY KEY,
+    database_instance_id TEXT NOT NULL REFERENCES database_instances(id) ON DELETE CASCADE,
+    agent_id TEXT NOT NULL,
+    collected_at TIMESTAMPTZ NOT NULL,
+    schema_name TEXT NOT NULL,
+    table_name TEXT NOT NULL,
+    live_rows BIGINT NOT NULL DEFAULT 0,
+    dead_rows BIGINT NOT NULL DEFAULT 0,
+    sequential_scans BIGINT NOT NULL DEFAULT 0,
+    sequential_rows_read BIGINT NOT NULL DEFAULT 0,
+    index_scans BIGINT NOT NULL DEFAULT 0,
+    index_rows_fetched BIGINT NOT NULL DEFAULT 0,
+    rows_inserted BIGINT NOT NULL DEFAULT 0,
+    rows_updated BIGINT NOT NULL DEFAULT 0,
+    rows_deleted BIGINT NOT NULL DEFAULT 0,
+    last_vacuum_at TIMESTAMPTZ,
+    last_autovacuum_at TIMESTAMPTZ,
+    last_analyze_at TIMESTAMPTZ,
+    last_autoanalyze_at TIMESTAMPTZ,
+    vacuum_count BIGINT NOT NULL DEFAULT 0,
+    autovacuum_count BIGINT NOT NULL DEFAULT 0,
+    analyze_count BIGINT NOT NULL DEFAULT 0,
+    autoanalyze_count BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_table_stats_instance ON table_stats (database_instance_id);
+
+CREATE TABLE IF NOT EXISTS query_stats (
+    id BIGSERIAL PRIMARY KEY,
+    database_instance_id TEXT NOT NULL REFERENCES database_instances(id) ON DELETE CASCADE,
+    agent_id TEXT NOT NULL,
+    collected_at TIMESTAMPTZ NOT NULL,
+    query_id TEXT NOT NULL,
+    database_name TEXT NOT NULL,
+    user_name TEXT NOT NULL,
+    query TEXT NOT NULL,
+    calls BIGINT NOT NULL DEFAULT 0,
+    total_exec_time_ms DOUBLE PRECISION NOT NULL DEFAULT 0,
+    mean_exec_time_ms DOUBLE PRECISION NOT NULL DEFAULT 0,
+    min_exec_time_ms DOUBLE PRECISION NOT NULL DEFAULT 0,
+    max_exec_time_ms DOUBLE PRECISION NOT NULL DEFAULT 0,
+    rows_returned BIGINT NOT NULL DEFAULT 0,
+    shared_blocks_hit BIGINT NOT NULL DEFAULT 0,
+    shared_blocks_read BIGINT NOT NULL DEFAULT 0,
+    shared_blocks_dirtied BIGINT NOT NULL DEFAULT 0,
+    shared_blocks_written BIGINT NOT NULL DEFAULT 0,
+    temp_blocks_read BIGINT NOT NULL DEFAULT 0,
+    temp_blocks_written BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_query_stats_instance ON query_stats (database_instance_id);

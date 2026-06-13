@@ -1,86 +1,84 @@
 /* Postgresome — Design tokens
- * Ported from the standalone dashboard design (dark developer theme).
- * Blue-tinted neutral "ink" scale, a brightened Postgres-blue primary,
- * a teal signal accent, a categorical data-viz set, and GitHub-dark-inspired
- * semantic colors that read well on dark surfaces.
+ * Light, minimal developer-console theme inspired by Linear, GitHub, and
+ * Vercel. Token names match the previous dark theme so components keep
+ * working unchanged; only the values below were rewritten.
  */
 :root {
-  /* ---- Neutral ink scale (blue-tinted slate) ---- */
-  --ink-950: #08090D;
-  --ink-900: #0B0D12;
-  --ink-850: #0F121A;
-  --ink-800: #141821;
-  --ink-750: #1A1F2A;
-  --ink-700: #222837;
-  --ink-650: #2B3242;
-  --ink-600: #353D4F;
-  --ink-500: #475063;
-  --ink-400: #667085;
-  --ink-300: #8B95A7;
-  --ink-200: #AEB7C6;
-  --ink-100: #D4DAE3;
-  --ink-050: #ECEFF4;
+  /* ---- Neutral scale (light gray ramp, 050=lightest, 950=darkest) ---- */
+  --ink-050: #F6F8FA;
+  --ink-100: #EAEEF2;
+  --ink-200: #D8DEE4;
+  --ink-300: #AFB8C1;
+  --ink-400: #8C949E;
+  --ink-500: #6E7781;
+  --ink-600: #57606A;
+  --ink-700: #424A53;
+  --ink-750: #32383F;
+  --ink-800: #24292F;
+  --ink-850: #1B1F24;
+  --ink-900: #14181F;
+  --ink-950: #0D1117;
 
   /* ---- Brand: Postgres-leaning blue ---- */
-  --blue-700: #2F58B8;
-  --blue-600: #3B6FE0;
+  --blue-700: #1A4FBA;
+  --blue-600: #2962E0;
   --blue-500: #4D8DFF;   /* primary */
-  --blue-400: #74A6FF;
-  --blue-300: #9CC0FF;
-  --blue-tint: rgba(77, 141, 255, 0.12);
-  --blue-tint-strong: rgba(77, 141, 255, 0.20);
+  --blue-400: #6FA0FF;
+  --blue-300: #A9C5FF;
+  --blue-tint: rgba(41, 98, 224, 0.08);
+  --blue-tint-strong: rgba(41, 98, 224, 0.16);
 
   /* ---- Signal accent: teal (agent / live data) ---- */
-  --teal-500: #1FB8A0;
-  --teal-400: #2DD4BF;
-  --teal-tint: rgba(45, 212, 191, 0.12);
+  --teal-500: #0F9488;
+  --teal-400: #14B8A6;
+  --teal-tint: rgba(15, 148, 136, 0.10);
 
   /* ---- Categorical data-viz palette ---- */
-  --viz-1: #4D8DFF;  /* blue   */
-  --viz-2: #2DD4BF;  /* teal   */
-  --viz-3: #A78BFA;  /* purple */
-  --viz-4: #F5B544;  /* amber  */
-  --viz-5: #F471B5;  /* pink   */
-  --viz-6: #4ADE80;  /* green  */
+  --viz-1: #2962E0;  /* blue   */
+  --viz-2: #0F9488;  /* teal   */
+  --viz-3: #8B5CF6;  /* purple */
+  --viz-4: #D97706;  /* amber  */
+  --viz-5: #DB2777;  /* pink   */
+  --viz-6: #16A34A;  /* green  */
 
   /* ---- Semantic ---- */
-  --success: #3FB950;
-  --success-tint: rgba(63, 185, 80, 0.13);
-  --warning: #E3B341;
-  --warning-tint: rgba(227, 179, 65, 0.13);
-  --danger: #F85149;
-  --danger-tint: rgba(248, 81, 73, 0.13);
-  --info: #4D8DFF;
-  --info-tint: rgba(77, 141, 255, 0.13);
+  --success: #1A7F37;
+  --success-tint: rgba(26, 127, 55, 0.08);
+  --warning: #9A6700;
+  --warning-tint: rgba(154, 103, 0, 0.08);
+  --danger: #CF222E;
+  --danger-tint: rgba(207, 34, 46, 0.08);
+  --info: var(--blue-600);
+  --info-tint: var(--blue-tint);
 
   /* ================= Semantic aliases ================= */
   /* Surfaces */
-  --bg-app: var(--ink-950);
-  --bg-base: var(--ink-900);
-  --surface-sunken: var(--ink-850);
-  --surface-card: var(--ink-800);
-  --surface-raised: var(--ink-750);
-  --surface-hover: var(--ink-700);
-  --surface-active: var(--ink-650);
+  --bg-app: #FFFFFF;
+  --bg-base: #FFFFFF;
+  --surface-sunken: var(--ink-050);
+  --surface-card: #FFFFFF;
+  --surface-raised: var(--ink-050);
+  --surface-hover: var(--ink-100);
+  --surface-active: var(--ink-200);
 
   /* Borders */
-  --border-subtle: #1C2230;
-  --border-default: #262D3C;
-  --border-strong: #333B4D;
-  --border-focus: var(--blue-500);
+  --border-subtle: var(--ink-100);
+  --border-default: var(--ink-200);
+  --border-strong: var(--ink-300);
+  --border-focus: var(--blue-600);
 
   /* Text */
-  --text-primary: #E8ECF2;
-  --text-secondary: #A4AEBF;
-  --text-muted: #6B7588;
-  --text-faint: #4A5365;
-  --text-inverse: #0B0D12;
-  --text-link: var(--blue-400);
+  --text-primary: #1F2328;
+  --text-secondary: #59636E;
+  --text-muted: #6E7781;
+  --text-faint: #8C949E;
+  --text-inverse: #FFFFFF;
+  --text-link: var(--blue-600);
 
   /* Accents */
-  --accent: var(--blue-500);
-  --accent-hover: var(--blue-400);
-  --accent-press: var(--blue-600);
+  --accent: var(--blue-600);
+  --accent-hover: var(--blue-700);
+  --accent-press: var(--blue-700);
   --accent-tint: var(--blue-tint);
   --on-accent: #FFFFFF;
 
@@ -148,20 +146,15 @@
 
   --border-w: 1px;
 
-  /* ---- Elevation / shadows / motion ---- */
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.35);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.5);
-  --shadow-xl: 0 24px 56px rgba(0, 0, 0, 0.55);
+  /* ---- Elevation / motion ---- */
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.08);
+  --shadow-lg: 0 12px 28px rgba(16, 24, 40, 0.10);
+  --shadow-xl: 0 24px 56px rgba(16, 24, 40, 0.14);
 
-  --hairline-top: inset 0 1px 0 rgba(255, 255, 255, 0.03);
-
-  --focus-ring: 0 0 0 3px rgba(77, 141, 255, 0.35);
-  --focus-ring-danger: 0 0 0 3px rgba(248, 81, 73, 0.32);
-
-  --glow-accent: 0 0 0 1px rgba(77, 141, 255, 0.4), 0 4px 16px rgba(77, 141, 255, 0.25);
-  --glow-success: 0 0 8px rgba(63, 185, 80, 0.55);
+  --focus-ring: 0 0 0 3px rgba(41, 98, 224, 0.25);
+  --focus-ring-danger: 0 0 0 3px rgba(207, 34, 46, 0.2);
 
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);

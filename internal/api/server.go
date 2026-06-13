@@ -35,6 +35,11 @@ func NewServer(addr string, pool *pgxpool.Pool) *Server {
 	mux.HandleFunc("GET /api/metrics/query", s.handleQueryMetrics)
 	mux.HandleFunc("POST /api/findings/ingest", s.handleIngestFindings)
 	mux.HandleFunc("GET /api/dashboard/overview", s.handleDashboardOverview)
+	mux.HandleFunc("GET /api/findings", s.handleListFindings)
+	mux.HandleFunc("POST /api/tables/ingest", s.handleIngestTableStats)
+	mux.HandleFunc("GET /api/tables", s.handleListTableStats)
+	mux.HandleFunc("POST /api/queries/ingest", s.handleIngestQueryStats)
+	mux.HandleFunc("GET /api/queries", s.handleListQueryStats)
 
 	s.httpServer = &http.Server{
 		Addr:    addr,

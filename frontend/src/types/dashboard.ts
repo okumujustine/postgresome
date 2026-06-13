@@ -44,3 +44,24 @@ export interface DashboardOverview {
   summary: DashboardSummary;
   findings: DashboardFindings;
 }
+
+export interface FindingsListResponse {
+  database_instance: DashboardInstance;
+  severity_counts: { critical: number; warning: number; info: number };
+  total: number;
+  limit: number;
+  offset: number;
+  findings: DashboardFinding[];
+}
+
+export interface MetricQueryPoint {
+  time: string;
+  value: number;
+}
+
+export interface MetricQueryResponse {
+  metric_key: string;
+  range: string;
+  interval: string;
+  points: MetricQueryPoint[];
+}

@@ -235,6 +235,26 @@ func (r *Runner) Start(ctx context.Context) error {
 				findingsSent = len(findings)
 			}
 
+			if tableStatsSnapshot != nil {
+				sendTableStatsCtx, sendTableStatsCancel := context.WithTimeout(ctx, 5*time.Second)
+				_, err = apiClient.SendTableStats(sendTableStatsCtx, r.cfg.AgentID, r.cfg.DatabaseInstanceID, tableStatsSnapshot)
+				sendTableStatsCancel()
+
+				if err != nil {
+					fmt.Printf("failed to send table stats to API: %v\n", err)
+				}
+			}
+
+			if queryStatsSnapshot != nil {
+				sendQueryStatsCtx, sendQueryStatsCancel := context.WithTimeout(ctx, 5*time.Second)
+				_, err = apiClient.SendQueryStats(sendQueryStatsCtx, r.cfg.AgentID, r.cfg.DatabaseInstanceID, queryStatsSnapshot)
+				sendQueryStatsCancel()
+
+				if err != nil {
+					fmt.Printf("failed to send query stats to API: %v\n", err)
+				}
+			}
+
 			activitySessions := 0
 			if activitySnapshot != nil {
 				activitySessions = len(activitySnapshot.Activities)

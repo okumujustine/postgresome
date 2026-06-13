@@ -37,13 +37,13 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--ink-700);
+  background: var(--border-default);
   border-radius: var(--radius-pill);
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-600);
+  background: var(--border-strong);
   background-clip: padding-box;
   border: 2px solid transparent;
 }
@@ -57,16 +57,4 @@ pre,
 
 .tabular {
   font-variant-numeric: tabular-nums;
-}
-
-@keyframes psm-ping {
-  0% {
-    transform: scale(1);
-    opacity: 0.55;
-  }
-  70%,
-  100% {
-    transform: scale(2.4);
-    opacity: 0;
-  }
 }
