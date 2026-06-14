@@ -93,9 +93,9 @@ func toDashboardFindingDTO(f repository.RecentFinding) dashboardFindingDTO {
 }
 
 // handleDashboardOverview serves GET /api/dashboard/overview, an aggregation
-// endpoint that summarizes a database instance's health, key metrics with
-// trends, and recent findings for the dashboard landing page. Detailed
-// charts should continue to use GET /api/metrics/query.
+// endpoint that summarizes database health, key diagnosis signals, and
+// recent findings for the frontend's health landing view. Detailed
+// historical evidence can continue to use GET /api/metrics/query.
 func (s *Server) handleDashboardOverview(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 

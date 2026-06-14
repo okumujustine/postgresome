@@ -1,61 +1,64 @@
 package rules
 
 import (
-	"fmt"
-
 	"github.com/okumujustine/postgresome/internal/analysis"
+	"github.com/okumujustine/postgresome/internal/analysis/config"
 	"github.com/okumujustine/postgresome/internal/metrics"
-)
-
-const (
-	expensiveQueryWarningTotalExecutionTimeMs  = 10000
-	expensiveQueryCriticalTotalExecutionTimeMs = 60000
 )
 
 // ExpensiveQueryRule detects queries that consume a large amount of total
 // database time across all their executions, which can indicate a query
 // that runs too frequently, scans too much data, or both.
-type ExpensiveQueryRule struct{}
+type ExpensiveQueryRule struct {
+	Config config.RuleConfig
+}
 
 func (r ExpensiveQueryRule) Name() string {
-	return "expensive_query"
+	return config.RuleKeyExpensiveQuery
 }
 
 func (r ExpensiveQueryRule) Analyze(snapshot metrics.QueryStatsSnapshot) []analysis.Finding {
+	if !r.Config.Enabled {
+		return nil
+	}
+
+	warningThreshold := r.Config.Thresholds["warning_ms"]
+	criticalThreshold := r.Config.Thresholds["critical_ms"]
+
 	findings := make([]analysis.Finding, 0)
 
 	for _, query := range snapshot.Queries {
 		switch {
-		case query.TotalExecutionTimeMs >= expensiveQueryCriticalTotalExecutionTimeMs:
+		case query.TotalExecutionTimeMs >= criticalThreshold:
 			findings = append(findings, analysis.Finding{
 				DetectedAt:         snapshot.CollectedAt,
 				DatabaseInstanceID: snapshot.DatabaseInstanceID,
 				Severity:           "critical",
 				Category:           "queries",
-				Title:              "Critical query cost detected",
-				Message:            fmt.Sprintf("Query %q has a total execution time of %.0f ms across %d calls.", previewQuery(query.Query, queryPreviewMaxLength), query.TotalExecutionTimeMs, query.Calls),
-				Recommendation:     "This query consumes significant database time. Review frequency, indexing, and whether results can be cached or optimized.",
+				Title:              r.Config.Title,
+				Message:            r.Config.Description,
+				Recommendation:     r.Config.Recommendation,
 				RuleKey:            r.Name(),
 				ResourceType:       "query",
 				ResourceName:       query.QueryID,
 				CurrentValue:       query.TotalExecutionTimeMs,
-				ThresholdValue:     expensiveQueryCriticalTotalExecutionTimeMs,
+				ThresholdValue:     criticalThreshold,
 			})
 
-		case query.TotalExecutionTimeMs >= expensiveQueryWarningTotalExecutionTimeMs:
+		case query.TotalExecutionTimeMs >= warningThreshold:
 			findings = append(findings, analysis.Finding{
 				DetectedAt:         snapshot.CollectedAt,
 				DatabaseInstanceID: snapshot.DatabaseInstanceID,
-				Severity:           "warning",
+				Severity:           r.Config.Severity,
 				Category:           "queries",
-				Title:              "High total query cost detected",
-				Message:            fmt.Sprintf("Query %q has a total execution time of %.0f ms across %d calls.", previewQuery(query.Query, queryPreviewMaxLength), query.TotalExecutionTimeMs, query.Calls),
-				Recommendation:     "This query consumes significant database time. Review frequency, indexing, and whether results can be cached or optimized.",
+				Title:              r.Config.Title,
+				Message:            r.Config.Description,
+				Recommendation:     r.Config.Recommendation,
 				RuleKey:            r.Name(),
 				ResourceType:       "query",
 				ResourceName:       query.QueryID,
 				CurrentValue:       query.TotalExecutionTimeMs,
-				ThresholdValue:     expensiveQueryWarningTotalExecutionTimeMs,
+				ThresholdValue:     warningThreshold,
 			})
 		}
 	}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, Copy, Search, Sparkles } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Search } from 'lucide-react';
 import { listFindings } from '../api/findings';
 import { ApiError } from '../api/client';
 import type { DashboardFinding, MetricRange } from '../types/dashboard';
@@ -31,7 +31,7 @@ function StatusPill({ status }: { status: string }) {
 
 function SectionLabel({ children }: { children: string }) {
   return (
-    <div className="mb-2 text-xs font-semibold uppercase" style={{ color: 'var(--text-faint)', letterSpacing: 'var(--ls-label)' }}>
+    <div className="mb-2 text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
       {children}
     </div>
   );
@@ -62,7 +62,7 @@ export function IssueDetailPage() {
     } catch (err) {
       const message =
         err instanceof ApiError
-          ? `The Postgresome API returned an error (${err.status}).`
+          ? `The Postgresome API returned an error (${err.status}). Try refreshing.`
           : 'Unable to reach the Postgresome API. Is it running?';
       setError(message);
     } finally {
@@ -137,20 +137,23 @@ export function IssueDetailPage() {
         </Card>
       ) : (
         <div className="flex flex-col gap-5">
-          <Card>
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <StatusPill status={finding.status} />
-                <SeverityPill severity={finding.severity} />
-                <span className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
-                  {finding.resource_type}: {finding.resource_name}
-                </span>
-              </div>
-              <h1 className="m-0 text-[var(--fs-h1)] font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: 'var(--ls-tight)' }}>
-                {finding.title}
-              </h1>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <SeverityPill severity={finding.severity} />
+              <StatusPill status={finding.status} />
+              <span className="text-xs" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                {finding.resource_type}: {finding.resource_name}
+              </span>
             </div>
-          </Card>
+            <h1 className="m-0 text-[var(--fs-h1)] font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: 'var(--ls-tight)' }}>
+              {finding.title}
+            </h1>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" style={{ color: 'var(--text-faint)' }}>
+              <span>First seen {formatRelativeTime(finding.first_seen_at)}</span>
+              <span>Last seen {formatRelativeTime(finding.last_seen_at)}</span>
+              <span>Seen {finding.occurrence_count} times</span>
+            </div>
+          </div>
 
           <Card title="Problem">
             <p className="m-0 text-[13.5px]" style={{ color: 'var(--text-secondary)' }}>
@@ -179,42 +182,15 @@ export function IssueDetailPage() {
                 </div>
               </div>
             </div>
-          </Card>
-
-          <Card title="Timeline">
-            <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
-              <div>
-                <SectionLabel>First detected</SectionLabel>
-                <div className="text-[13px]" style={{ color: 'var(--text-secondary)' }} title={new Date(finding.first_seen_at).toLocaleString()}>
-                  {formatRelativeTime(finding.first_seen_at)}
-                </div>
-              </div>
-              <div>
-                <SectionLabel>Last detected</SectionLabel>
-                <div className="text-[13px]" style={{ color: 'var(--text-secondary)' }} title={new Date(finding.last_seen_at).toLocaleString()}>
-                  {formatRelativeTime(finding.last_seen_at)}
-                </div>
-              </div>
-              <div>
-                <SectionLabel>Occurrences</SectionLabel>
-                <div className="tabular text-[13px]" style={{ color: 'var(--text-secondary)' }}>
-                  {finding.occurrence_count}
-                </div>
-              </div>
+            <div className="mt-4 rounded-[var(--radius-md)] border px-3 py-3 text-[13px] leading-[1.5]" style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-raised)', color: 'var(--text-secondary)' }}>
+              Evidence shows that <span style={{ color: 'var(--text-primary)', fontWeight: 'var(--fw-medium)' }}>{finding.resource_name}</span> crossed the configured threshold for <span style={{ color: 'var(--text-primary)', fontWeight: 'var(--fw-medium)' }}>{finding.rule_key}</span>.
             </div>
           </Card>
 
-          <Card title="Recommendation">
+          <Card title="Recommended fix">
             <p className="m-0 text-[13.5px]" style={{ color: 'var(--text-secondary)' }}>
               {finding.recommendation || 'No recommendation available.'}
             </p>
-          </Card>
-
-          <Card title="AI recommendation">
-            <div className="flex items-center gap-2 text-[13.5px]" style={{ color: 'var(--text-muted)' }}>
-              <Sparkles size={15} />
-              AI-powered recommendations are coming soon.
-            </div>
           </Card>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -224,23 +200,7 @@ export function IssueDetailPage() {
               style={{ background: 'var(--surface-raised)', color: 'var(--text-primary)', borderColor: 'var(--border-default)' }}
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
-              {copied ? 'Copied' : 'Copy summary'}
-            </button>
-            <button
-              disabled
-              title="Coming soon"
-              className="inline-flex h-[var(--control-h-md)] cursor-not-allowed items-center gap-[6px] rounded-[var(--radius-md)] border px-4 text-[13px] font-medium opacity-40"
-              style={{ background: 'var(--surface-raised)', color: 'var(--text-secondary)', borderColor: 'var(--border-default)' }}
-            >
-              Ignore
-            </button>
-            <button
-              disabled
-              title="Coming soon"
-              className="inline-flex h-[var(--control-h-md)] cursor-not-allowed items-center gap-[6px] rounded-[var(--radius-md)] border px-4 text-[13px] font-medium opacity-40"
-              style={{ background: 'var(--surface-raised)', color: 'var(--text-secondary)', borderColor: 'var(--border-default)' }}
-            >
-              Mark resolved
+              {copied ? 'Copied' : 'Copy diagnosis'}
             </button>
           </div>
         </div>

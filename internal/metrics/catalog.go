@@ -10,8 +10,8 @@ const (
 	VisualizationTable     Visualization = "table"
 )
 
-// MetricDefinition describes a metric that is available for dashboards to
-// visualize. It does not store any metric values.
+// MetricDefinition describes a metric Postgresome knows how to store and
+// query as diagnostic evidence. It does not store any metric values.
 type MetricDefinition struct {
 	Key         string
 	Label       string

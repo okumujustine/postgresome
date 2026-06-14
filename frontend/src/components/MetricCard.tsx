@@ -18,8 +18,8 @@ export function MetricCard({ label, value, unit, trendPercent, invertTrend = fal
 
   return (
     <div
-      className="flex min-w-0 flex-col gap-3 rounded-[var(--radius-lg)] border p-5"
-      style={{ background: 'var(--surface-card)', borderColor: 'var(--border-subtle)', boxShadow: 'var(--shadow-xs)' }}
+      className="flex min-w-0 flex-col gap-[10px] rounded-[var(--radius-lg)] border px-4 py-[14px]"
+      style={{ background: 'var(--surface-card)', borderColor: 'var(--border-subtle)' }}
     >
       <div className="flex items-center gap-2">
         {icon && (
@@ -50,14 +50,14 @@ export function MetricCard({ label, value, unit, trendPercent, invertTrend = fal
           {value}
         </span>
         {unit && (
-          <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
+          <span className="text-[13px] font-medium" style={{ color: 'var(--text-muted)' }}>
             {unit}
           </span>
         )}
       </div>
 
       {hideFooter ? null : hasTrend ? (
-        <div className="flex items-center gap-[5px] text-[12.5px] font-medium" style={{ color: deltaColor }}>
+        <div className="flex items-center gap-[5px] text-[12px] font-medium" style={{ color: deltaColor }}>
           <svg
             width="12"
             height="12"
@@ -76,7 +76,7 @@ export function MetricCard({ label, value, unit, trendPercent, invertTrend = fal
           <span style={{ color: 'var(--text-muted)', fontWeight: 'var(--fw-regular)' }}>vs previous period</span>
         </div>
       ) : (
-        <div className="text-[12.5px] font-medium" style={{ color: 'var(--text-muted)' }}>
+        <div className="text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
           No change vs previous period
         </div>
       )}

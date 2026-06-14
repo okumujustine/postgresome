@@ -1,10 +1,9 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { HealthPage } from './pages/HealthPage';
 import { IssuesPage } from './pages/IssuesPage';
 import { IssueDetailPage } from './pages/IssueDetailPage';
 import { QueriesPage } from './pages/QueriesPage';
 import { TablesPage } from './pages/TablesPage';
-import { MetricsPage } from './pages/MetricsPage';
 
 function App() {
   return (
@@ -14,7 +13,7 @@ function App() {
       <Route path="/issues/:id" element={<IssueDetailPage />} />
       <Route path="/queries" element={<QueriesPage />} />
       <Route path="/tables" element={<TablesPage />} />
-      <Route path="/metrics" element={<MetricsPage />} />
+      <Route path="/metrics" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

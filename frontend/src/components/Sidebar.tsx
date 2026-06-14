@@ -1,4 +1,4 @@
-import { AlertTriangle, HeartPulse, LayoutDashboard, LineChart, Table2, Terminal } from 'lucide-react';
+import { AlertTriangle, Database, HeartPulse, Table2, Terminal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
@@ -16,55 +16,43 @@ const DATABASE_ITEMS: NavItem[] = [
   { to: '/tables', label: 'Tables', icon: Table2, end: false },
 ];
 
-const ANALYZE_ITEMS: NavItem[] = [
-  { to: '/metrics', label: 'Metrics', icon: LineChart, end: false },
-];
-
-function NavSection({ title, items }: { title: string; items: NavItem[] }) {
+function NavList({ items }: { items: NavItem[] }) {
   return (
-    <div>
-      <div
-        className="px-[11px] pb-[7px] text-[10.5px] font-semibold uppercase"
-        style={{ color: 'var(--text-faint)', letterSpacing: 'var(--ls-label)' }}
-      >
-        {title}
-      </div>
-      <div className="flex flex-col gap-[3px]">
-        {items.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              `relative flex h-[38px] items-center gap-[11px] rounded-[var(--radius-md)] px-[11px] text-[13.5px] font-semibold no-underline transition-colors ${
-                isActive ? '' : 'hover:bg-[var(--surface-hover)]'
-              }`
-            }
-            style={({ isActive }) =>
-              isActive
-                ? {
-                    color: 'var(--text-primary)',
-                    background: 'var(--blue-tint)',
-                    boxShadow: 'inset 0 0 0 1px rgba(41,98,224,0.25)',
-                  }
-                : { color: 'var(--text-secondary)' }
-            }
-          >
-            {({ isActive }) => (
-              <>
-                {isActive && (
-                  <span
-                    className="absolute left-0 rounded-[2px]"
-                    style={{ top: 8, bottom: 8, width: 2.5, background: 'var(--accent)' }}
-                  />
-                )}
-                <Icon size={16} style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }} />
-                <span>{label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
-      </div>
+    <div className="flex flex-col gap-[3px]">
+      {items.map(({ to, label, icon: Icon, end }) => (
+        <NavLink
+          key={to}
+          to={to}
+          end={end}
+          className={({ isActive }) =>
+            `relative flex h-[34px] items-center gap-[10px] rounded-[var(--radius-md)] px-[11px] text-[13px] font-medium no-underline transition-colors ${
+              isActive ? '' : 'hover:bg-[var(--surface-hover)]'
+            }`
+          }
+          style={({ isActive }) =>
+            isActive
+              ? {
+                  color: 'var(--text-primary)',
+                  background: 'var(--surface-hover)',
+                  boxShadow: 'inset 0 0 0 1px var(--border-subtle)',
+                }
+              : { color: 'var(--text-secondary)' }
+          }
+        >
+          {({ isActive }) => (
+            <>
+              {isActive && (
+                <span
+                  className="absolute left-0 rounded-[2px]"
+                  style={{ top: 7, bottom: 7, width: 2, background: 'var(--accent)' }}
+                />
+              )}
+              <Icon size={16} style={{ color: isActive ? 'var(--accent)' : 'var(--text-muted)' }} />
+              <span>{label}</span>
+            </>
+          )}
+        </NavLink>
+      ))}
     </div>
   );
 }
@@ -81,18 +69,22 @@ export function Sidebar() {
       >
         <div
           className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-[var(--radius-sm)]"
-          style={{ background: 'var(--blue-tint)', color: 'var(--blue-600)' }}
+          style={{ background: 'var(--surface-hover)', color: 'var(--blue-600)', border: '1px solid var(--border-subtle)' }}
         >
-          <LayoutDashboard size={15} strokeWidth={2} />
+          <Database size={15} strokeWidth={2} />
         </div>
-        <span className="text-[15.5px] font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: 'var(--ls-tight)' }}>
-          Postgres<span style={{ color: 'var(--blue-500)' }}>ome</span>
-        </span>
+        <div className="min-w-0">
+          <div className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: 'var(--ls-tight)' }}>
+            Postgresome
+          </div>
+          <div className="truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            PostgreSQL diagnosis
+          </div>
+        </div>
       </div>
 
       <nav className="flex flex-1 flex-col gap-[18px] overflow-y-auto p-3">
-        <NavSection title="Database" items={DATABASE_ITEMS} />
-        <NavSection title="Analyze" items={ANALYZE_ITEMS} />
+        <NavList items={DATABASE_ITEMS} />
       </nav>
     </aside>
   );

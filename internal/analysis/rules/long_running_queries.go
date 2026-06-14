@@ -5,24 +5,29 @@ import (
 	"time"
 
 	"github.com/okumujustine/postgresome/internal/analysis"
+	"github.com/okumujustine/postgresome/internal/analysis/config"
 	"github.com/okumujustine/postgresome/internal/metrics"
-)
-
-const (
-	longRunningQueryWarningThreshold  = 1 * time.Minute
-	longRunningQueryCriticalThreshold = 10 * time.Minute
 )
 
 // LongRunningQueryRule detects active queries that have been running for an
 // unusually long time, which can indicate inefficient queries, missing
 // indexes, large table scans, or stuck application requests.
-type LongRunningQueryRule struct{}
+type LongRunningQueryRule struct {
+	Config config.RuleConfig
+}
 
 func (r LongRunningQueryRule) Name() string {
-	return "long_running_queries"
+	return config.RuleKeyLongRunningQuery
 }
 
 func (r LongRunningQueryRule) Analyze(snapshot metrics.DatabaseActivitySnapshot) []analysis.Finding {
+	if !r.Config.Enabled {
+		return nil
+	}
+
+	warningThreshold := time.Duration(r.Config.Thresholds["warning_minutes"] * float64(time.Minute))
+	criticalThreshold := time.Duration(r.Config.Thresholds["critical_minutes"] * float64(time.Minute))
+
 	findings := make([]analysis.Finding, 0)
 
 	for _, a := range snapshot.Activities {
@@ -31,27 +36,27 @@ func (r LongRunningQueryRule) Analyze(snapshot metrics.DatabaseActivitySnapshot)
 		}
 
 		duration := snapshot.CollectedAt.Sub(*a.QueryStartedAt)
-		if duration < longRunningQueryWarningThreshold {
+		if duration < warningThreshold {
 			continue
 		}
 
 		minutes := duration.Minutes()
 		session := describeSession(a)
 
-		if duration >= longRunningQueryCriticalThreshold {
+		if duration >= criticalThreshold {
 			findings = append(findings, analysis.Finding{
 				DetectedAt:         snapshot.CollectedAt,
 				DatabaseInstanceID: snapshot.DatabaseInstanceID,
 				Severity:           "critical",
 				Category:           "queries",
-				Title:              "Critical long running query detected",
-				Message:            fmt.Sprintf("A query has been executing for more than %.1f minutes on %s.", minutes, session),
-				Recommendation:     "Investigate immediately for inefficient queries, locks, or missing indexes.",
+				Title:              r.Config.Title,
+				Message:            r.Config.Description,
+				Recommendation:     r.Config.Recommendation,
 				RuleKey:            r.Name(),
 				ResourceType:       "session",
 				ResourceName:       session,
 				CurrentValue:       minutes,
-				ThresholdValue:     longRunningQueryCriticalThreshold.Minutes(),
+				ThresholdValue:     criticalThreshold.Minutes(),
 			})
 			continue
 		}
@@ -59,16 +64,16 @@ func (r LongRunningQueryRule) Analyze(snapshot metrics.DatabaseActivitySnapshot)
 		findings = append(findings, analysis.Finding{
 			DetectedAt:         snapshot.CollectedAt,
 			DatabaseInstanceID: snapshot.DatabaseInstanceID,
-			Severity:           "warning",
+			Severity:           r.Config.Severity,
 			Category:           "queries",
-			Title:              "Long running query detected",
-			Message:            fmt.Sprintf("A query has been running for %.1f minutes on %s.", minutes, session),
-			Recommendation:     "Review query execution plan, indexes, and query complexity.",
+			Title:              r.Config.Title,
+			Message:            r.Config.Description,
+			Recommendation:     r.Config.Recommendation,
 			RuleKey:            r.Name(),
 			ResourceType:       "session",
 			ResourceName:       session,
 			CurrentValue:       minutes,
-			ThresholdValue:     longRunningQueryWarningThreshold.Minutes(),
+			ThresholdValue:     warningThreshold.Minutes(),
 		})
 	}
 

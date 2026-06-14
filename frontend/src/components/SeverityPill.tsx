@@ -13,8 +13,8 @@ export function SeverityPill({ severity }: { severity: string }) {
 
   return (
     <span
-      className="inline-flex h-[22px] items-center rounded-[var(--radius-pill)] px-[9px] text-xs font-medium capitalize"
-      style={{ background: style.bg, color: style.fg, border: `1px solid ${style.border}`, letterSpacing: 'var(--ls-snug)' }}
+      className="inline-flex h-[20px] items-center rounded-[var(--radius-pill)] px-[8px] text-[11px] font-medium capitalize"
+      style={{ background: style.bg, color: style.fg, border: `1px solid ${style.border}` }}
     >
       {severity}
     </span>

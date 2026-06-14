@@ -59,7 +59,7 @@ export function MetricsPage() {
     } catch (err) {
       const message =
         err instanceof ApiError
-          ? `The Postgresome API returned an error (${err.status}).`
+          ? `The Postgresome API returned an error (${err.status}). Try refreshing.`
           : 'Unable to reach the Postgresome API. Is it running?';
       setError(message);
     } finally {

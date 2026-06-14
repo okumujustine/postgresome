@@ -11,11 +11,11 @@ export function Card({ title, subtitle, actions, children }: CardProps) {
   return (
     <div
       className="min-w-0 overflow-hidden rounded-[var(--radius-lg)] border"
-      style={{ background: 'var(--surface-card)', borderColor: 'var(--border-subtle)', boxShadow: 'var(--shadow-xs)' }}
+      style={{ background: 'var(--surface-card)', borderColor: 'var(--border-subtle)' }}
     >
       {title && (
         <div
-          className="flex items-center gap-[10px] border-b px-5 py-4"
+          className="flex items-center gap-[10px] border-b px-4 py-3"
           style={{ borderColor: 'var(--border-subtle)' }}
         >
           <div className="min-w-0 flex-1">
@@ -26,7 +26,7 @@ export function Card({ title, subtitle, actions, children }: CardProps) {
               {title}
             </div>
             {subtitle && (
-              <div className="mt-[2px] text-xs" style={{ color: 'var(--text-muted)' }}>
+              <div className="mt-[3px] text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
                 {subtitle}
               </div>
             )}
@@ -34,7 +34,7 @@ export function Card({ title, subtitle, actions, children }: CardProps) {
           {actions && <div className="flex shrink-0 items-center gap-[6px]">{actions}</div>}
         </div>
       )}
-      <div className="p-5">{children}</div>
+      <div className="p-4">{children}</div>
     </div>
   );
 }

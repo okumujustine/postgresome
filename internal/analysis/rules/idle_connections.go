@@ -2,26 +2,26 @@ package rules
 
 import (
 	"github.com/okumujustine/postgresome/internal/analysis"
+	"github.com/okumujustine/postgresome/internal/analysis/config"
 	"github.com/okumujustine/postgresome/internal/metrics"
-)
-
-const (
-	idleConnectionsWarningRatio  = 0.50
-	idleConnectionsCriticalRatio = 0.80
-
-	idleInTransactionCriticalThreshold = 5
 )
 
 // IdleConnectionRule detects when a large share of database sessions are
 // idle, which can indicate connection leaks or oversized application
 // connection pools.
-type IdleConnectionRule struct{}
+type IdleConnectionRule struct {
+	Config config.RuleConfig
+}
 
 func (r IdleConnectionRule) Name() string {
-	return "idle_connections"
+	return config.RuleKeyIdleConnections
 }
 
 func (r IdleConnectionRule) Analyze(snapshot metrics.DatabaseActivitySnapshot) []analysis.Finding {
+	if !r.Config.Enabled {
+		return nil
+	}
+
 	total := 0
 	idle := 0
 	idleInTransaction := 0
@@ -48,36 +48,39 @@ func (r IdleConnectionRule) Analyze(snapshot metrics.DatabaseActivitySnapshot) [
 	}
 
 	idlePercentage := float64(idle) / float64(total)
+	warningRatio := r.Config.Thresholds["warning_ratio"]
+	criticalRatio := r.Config.Thresholds["critical_ratio"]
+	idleInTransactionCritical := r.Config.Thresholds["idle_in_transaction_critical"]
 
 	switch {
-	case idlePercentage >= idleConnectionsCriticalRatio || idleInTransaction >= idleInTransactionCriticalThreshold:
+	case idlePercentage >= criticalRatio || float64(idleInTransaction) >= idleInTransactionCritical:
 		return []analysis.Finding{{
 			DetectedAt:         snapshot.CollectedAt,
 			DatabaseInstanceID: snapshot.DatabaseInstanceID,
 			Severity:           "critical",
 			Category:           "connections",
-			Title:              "Critical idle connection pressure detected",
-			Message:            "Most database sessions are idle or several sessions are idle in transaction.",
-			Recommendation:     "Investigate connection leaks, idle transactions, and application pool configuration immediately.",
+			Title:              r.Config.Title,
+			Message:            r.Config.Description,
+			Recommendation:     r.Config.Recommendation,
 			RuleKey:            r.Name(),
 			ResourceType:       "database",
 			CurrentValue:       idlePercentage,
-			ThresholdValue:     idleConnectionsCriticalRatio,
+			ThresholdValue:     criticalRatio,
 		}}
 
-	case idlePercentage >= idleConnectionsWarningRatio || idleInTransaction > 0:
+	case idlePercentage >= warningRatio || idleInTransaction > 0:
 		return []analysis.Finding{{
 			DetectedAt:         snapshot.CollectedAt,
 			DatabaseInstanceID: snapshot.DatabaseInstanceID,
-			Severity:           "warning",
+			Severity:           r.Config.Severity,
 			Category:           "connections",
-			Title:              "High idle connection usage detected",
-			Message:            "A large percentage of database sessions are idle.",
-			Recommendation:     "Review application connection pooling and check whether connections are being held longer than necessary.",
+			Title:              r.Config.Title,
+			Message:            r.Config.Description,
+			Recommendation:     r.Config.Recommendation,
 			RuleKey:            r.Name(),
 			ResourceType:       "database",
 			CurrentValue:       idlePercentage,
-			ThresholdValue:     idleConnectionsWarningRatio,
+			ThresholdValue:     warningRatio,
 		}}
 
 	default:

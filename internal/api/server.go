@@ -13,8 +13,8 @@ import (
 const shutdownTimeout = 5 * time.Second
 
 // Server is the Postgresome HTTP API server. It runs independently of the
-// agent and will eventually serve collected metrics and findings to a
-// frontend dashboard.
+// agent and serves collected evidence, findings, and diagnosis-oriented
+// responses to the frontend.
 type Server struct {
 	addr       string
 	pool       *pgxpool.Pool
@@ -50,7 +50,7 @@ func NewServer(addr string, pool *pgxpool.Pool) *Server {
 	return s
 }
 
-// withCORS allows browser-based frontends (e.g. the dashboard dev server) to
+// withCORS allows browser-based frontends (e.g. the diagnosis UI dev server) to
 // call this read-only, unauthenticated API from a different origin.
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -26,7 +26,7 @@ export function QueriesPage() {
     } catch (err) {
       const message =
         err instanceof ApiError
-          ? `The Postgresome API returned an error (${err.status}).`
+          ? `The Postgresome API returned an error (${err.status}). Try refreshing.`
           : 'Unable to reach the Postgresome API. Is it running?';
       setError(message);
     } finally {
@@ -73,59 +73,65 @@ export function QueriesPage() {
             </div>
           </Card>
         ) : (
-          <Card
-            title="Queries"
-            subtitle={
-              data.collected_at
-                ? `Sorted by impact (calls × execution time) · Snapshot from ${formatRelativeTime(data.collected_at)}`
-                : 'Sorted by impact (calls × execution time)'
-            }
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]" style={{ borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Query</th>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Calls</th>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Average time</th>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Total impact</th>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Rows</th>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Disk usage</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {queries.map((q) => (
-                    <tr key={q.query_id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                      <td className="max-w-[480px] py-2 pr-4">
-                        <code
-                          title={q.query}
-                          className="block overflow-hidden whitespace-nowrap"
-                          style={{ textOverflow: 'ellipsis', color: 'var(--text-secondary)' }}
-                        >
-                          {q.query}
-                        </code>
-                      </td>
-                      <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
-                        {q.calls.toLocaleString()}
-                      </td>
-                      <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
-                        {formatDuration(q.mean_exec_time_ms)}
-                      </td>
-                      <td className="py-2 pr-4 font-semibold tabular" style={{ color: 'var(--text-primary)' }}>
-                        {formatDuration(q.total_exec_time_ms)}
-                      </td>
-                      <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
-                        {q.rows_returned.toLocaleString()}
-                      </td>
-                      <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
-                        {formatBytes(q.shared_blocks_read)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="flex flex-col gap-4">
+            <div className="border-b pb-4" style={{ borderColor: 'var(--border-subtle)' }}>
+              <h2 className="m-0 text-[18px] font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: 'var(--ls-snug)' }}>
+                Query evidence
+              </h2>
+              <div className="mt-1 max-w-[780px] text-[13px] leading-[1.55]" style={{ color: 'var(--text-muted)' }}>
+                Use this table to confirm which SQL statements are creating the most total load. Start at the top, then
+                compare the evidence here with the open issues in the diagnosis queue.
+                {data.collected_at ? ` Snapshot from ${formatRelativeTime(data.collected_at)}.` : ''}
+              </div>
             </div>
-          </Card>
+
+            <Card title="Highest-impact queries">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[13px]" style={{ borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Query</th>
+                      <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Calls</th>
+                      <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Average time</th>
+                      <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Total impact</th>
+                      <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Rows</th>
+                      <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Disk usage</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {queries.map((q) => (
+                      <tr key={q.query_id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                        <td className="max-w-[480px] py-2 pr-4">
+                          <code
+                            title={q.query}
+                            className="block overflow-hidden whitespace-nowrap"
+                            style={{ textOverflow: 'ellipsis', color: 'var(--text-secondary)', fontSize: '12.5px' }}
+                          >
+                            {q.query}
+                          </code>
+                        </td>
+                        <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
+                          {q.calls.toLocaleString()}
+                        </td>
+                        <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
+                          {formatDuration(q.mean_exec_time_ms)}
+                        </td>
+                        <td className="py-2 pr-4 font-semibold tabular" style={{ color: 'var(--text-primary)' }}>
+                          {formatDuration(q.total_exec_time_ms)}
+                        </td>
+                        <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
+                          {q.rows_returned.toLocaleString()}
+                        </td>
+                        <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
+                          {formatBytes(q.shared_blocks_read)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
         )
       ) : null}
     </Layout>

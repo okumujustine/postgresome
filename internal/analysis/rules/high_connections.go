@@ -1,58 +1,60 @@
 package rules
 
 import (
-	"fmt"
-
 	"github.com/okumujustine/postgresome/internal/analysis"
+	"github.com/okumujustine/postgresome/internal/analysis/config"
 	"github.com/okumujustine/postgresome/internal/metrics"
-)
-
-const (
-	highConnectionsWarningThreshold  = 100
-	highConnectionsCriticalThreshold = 500
 )
 
 // HighConnectionRule detects unusually high active connection counts,
 // which may indicate connection leaks, missing connection pooling, poor
 // pool configuration, or traffic spikes.
-type HighConnectionRule struct{}
+type HighConnectionRule struct {
+	Config config.RuleConfig
+}
 
 func (r HighConnectionRule) Name() string {
-	return "high_connections"
+	return config.RuleKeyHighConnections
 }
 
 func (r HighConnectionRule) Analyze(stats metrics.DatabaseStats, delta metrics.DatabaseMetricDelta) []analysis.Finding {
-	connections := stats.ActiveConnections
+	if !r.Config.Enabled {
+		return nil
+	}
+
+	connections := float64(stats.ActiveConnections)
+	warningThreshold := r.Config.Thresholds["warning"]
+	criticalThreshold := r.Config.Thresholds["critical"]
 
 	switch {
-	case connections > highConnectionsCriticalThreshold:
+	case connections > criticalThreshold:
 		return []analysis.Finding{{
 			DetectedAt:         delta.CollectedAt,
 			DatabaseInstanceID: delta.DatabaseInstanceID,
 			Severity:           "critical",
 			Category:           "connections",
-			Title:              "Critical database connection pressure",
-			Message:            fmt.Sprintf("Database has %d active connections which may affect performance.", connections),
-			Recommendation:     "Investigate connection spikes, idle connections, and connection pooling configuration.",
+			Title:              r.Config.Title,
+			Message:            r.Config.Description,
+			Recommendation:     r.Config.Recommendation,
 			RuleKey:            r.Name(),
 			ResourceType:       "database",
-			CurrentValue:       float64(connections),
-			ThresholdValue:     highConnectionsCriticalThreshold,
+			CurrentValue:       connections,
+			ThresholdValue:     criticalThreshold,
 		}}
 
-	case connections > highConnectionsWarningThreshold:
+	case connections > warningThreshold:
 		return []analysis.Finding{{
 			DetectedAt:         delta.CollectedAt,
 			DatabaseInstanceID: delta.DatabaseInstanceID,
-			Severity:           "warning",
+			Severity:           r.Config.Severity,
 			Category:           "connections",
-			Title:              "High database connections detected",
-			Message:            fmt.Sprintf("Database currently has %d active connections.", connections),
-			Recommendation:     "Review application connection pooling and check for connection leaks.",
+			Title:              r.Config.Title,
+			Message:            r.Config.Description,
+			Recommendation:     r.Config.Recommendation,
 			RuleKey:            r.Name(),
 			ResourceType:       "database",
-			CurrentValue:       float64(connections),
-			ThresholdValue:     highConnectionsWarningThreshold,
+			CurrentValue:       connections,
+			ThresholdValue:     warningThreshold,
 		}}
 
 	default:

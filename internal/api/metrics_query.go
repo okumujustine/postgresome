@@ -41,8 +41,8 @@ type metricQueryPointDTO struct {
 	Value float64   `json:"value"`
 }
 
-// handleQueryMetrics serves GET /api/metrics/query, returning a time series
-// of metric_points aggregated into buckets via TimescaleDB's time_bucket.
+// handleQueryMetrics serves GET /api/metrics/query, returning historical
+// metric evidence aggregated into buckets via TimescaleDB's time_bucket.
 func (s *Server) handleQueryMetrics(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 

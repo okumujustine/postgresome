@@ -1,27 +1,27 @@
 package rules
 
 import (
-	"fmt"
-
 	"github.com/okumujustine/postgresome/internal/analysis"
+	"github.com/okumujustine/postgresome/internal/analysis/config"
 	"github.com/okumujustine/postgresome/internal/metrics"
-)
-
-const (
-	blockedQueryWarningThreshold  = 1
-	blockedQueryCriticalThreshold = 5
 )
 
 // BlockedQueryRule detects sessions waiting on locks held by other
 // transactions, which can cause slow applications, request timeouts, and
 // database pileups.
-type BlockedQueryRule struct{}
+type BlockedQueryRule struct {
+	Config config.RuleConfig
+}
 
 func (r BlockedQueryRule) Name() string {
-	return "blocked_queries"
+	return config.RuleKeyBlockedQuery
 }
 
 func (r BlockedQueryRule) Analyze(snapshot metrics.DatabaseActivitySnapshot) []analysis.Finding {
+	if !r.Config.Enabled {
+		return nil
+	}
+
 	blocked := 0
 
 	for _, a := range snapshot.Activities {
@@ -30,35 +30,38 @@ func (r BlockedQueryRule) Analyze(snapshot metrics.DatabaseActivitySnapshot) []a
 		}
 	}
 
+	warningThreshold := r.Config.Thresholds["warning"]
+	criticalThreshold := r.Config.Thresholds["critical"]
+
 	switch {
-	case blocked > blockedQueryCriticalThreshold:
+	case float64(blocked) > criticalThreshold:
 		return []analysis.Finding{{
 			DetectedAt:         snapshot.CollectedAt,
 			DatabaseInstanceID: snapshot.DatabaseInstanceID,
 			Severity:           "critical",
 			Category:           "locks",
-			Title:              "Critical database lock contention detected",
-			Message:            "Multiple database sessions are blocked waiting for locks.",
-			Recommendation:     "Identify blocking queries and investigate transaction handling immediately.",
+			Title:              r.Config.Title,
+			Message:            r.Config.Description,
+			Recommendation:     r.Config.Recommendation,
 			RuleKey:            r.Name(),
 			ResourceType:       "database",
 			CurrentValue:       float64(blocked),
-			ThresholdValue:     blockedQueryCriticalThreshold,
+			ThresholdValue:     criticalThreshold,
 		}}
 
-	case blocked >= blockedQueryWarningThreshold:
+	case float64(blocked) >= warningThreshold:
 		return []analysis.Finding{{
 			DetectedAt:         snapshot.CollectedAt,
 			DatabaseInstanceID: snapshot.DatabaseInstanceID,
-			Severity:           "warning",
+			Severity:           r.Config.Severity,
 			Category:           "locks",
-			Title:              "Blocked database queries detected",
-			Message:            fmt.Sprintf("%d database sessions are waiting on locks.", blocked),
-			Recommendation:     "Review long-running transactions and queries holding locks.",
+			Title:              r.Config.Title,
+			Message:            r.Config.Description,
+			Recommendation:     r.Config.Recommendation,
 			RuleKey:            r.Name(),
 			ResourceType:       "database",
 			CurrentValue:       float64(blocked),
-			ThresholdValue:     blockedQueryWarningThreshold,
+			ThresholdValue:     warningThreshold,
 		}}
 
 	default:

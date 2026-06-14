@@ -1,7 +1,7 @@
 package metrics
 
-// DimensionDefinition describes a dimension that metrics can be grouped or
-// filtered by. It does not store any dimension values.
+// DimensionDefinition describes a dimension that diagnostic evidence can be
+// grouped or filtered by. It does not store any dimension values.
 type DimensionDefinition struct {
 	Key         string
 	Label       string

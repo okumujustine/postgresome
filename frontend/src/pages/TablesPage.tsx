@@ -1,16 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { getTableStats } from '../api/tables';
+import { listFindings } from '../api/findings';
 import { ApiError } from '../api/client';
 import type { TableStat, TableStatsResponse } from '../types/tables';
+import type { DashboardFinding, MetricRange } from '../types/dashboard';
 import { Layout } from '../components/Layout';
 import { Card } from '../components/Card';
+import { StatusBadge } from '../components/StatusBadge';
 import { formatRelativeTime } from '../lib/format';
 import { useDatabaseInstance } from '../lib/databaseInstance';
 
-const DEAD_ROW_WARNING_RATIO = 20;
-const INDEX_USAGE_WARNING_RATIO = 50;
-const INDEX_USAGE_MIN_SCANS = 10;
+const SEVERITY_RANK: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+const STATUS_RANK: Record<string, number> = { critical: 0, warning: 1, healthy: 2 };
+
+// Issues are an open-ended tracker — use the widest available range so
+// currently-open table findings aren't hidden by a short window (same
+// rationale as ISSUES_RANGE in IssuesPage.tsx).
+const FINDINGS_RANGE: MetricRange = '7d';
+const FINDINGS_LIMIT = 200;
 
 function deadRowRatio(table: TableStat): number {
   const total = table.live_rows + table.dead_rows;
@@ -26,8 +35,24 @@ function indexUsageRatio(table: TableStat): number | null {
   return (table.index_scans / totalScans) * 100;
 }
 
+function tableStatus(findings: DashboardFinding[]): 'critical' | 'warning' | 'healthy' {
+  if (findings.some((f) => f.severity === 'critical')) return 'critical';
+  if (findings.some((f) => f.severity === 'warning')) return 'warning';
+  return 'healthy';
+}
+
+function topFinding(findings: DashboardFinding[]): DashboardFinding | null {
+  if (findings.length === 0) return null;
+  return [...findings].sort((a, b) => {
+    const rankDiff = (SEVERITY_RANK[a.severity] ?? 3) - (SEVERITY_RANK[b.severity] ?? 3);
+    if (rankDiff !== 0) return rankDiff;
+    return new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime();
+  })[0];
+}
+
 export function TablesPage() {
   const [data, setData] = useState<TableStatsResponse | null>(null);
+  const [findings, setFindings] = useState<DashboardFinding[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { selectedId, loading: instanceLoading } = useDatabaseInstance();
@@ -38,13 +63,17 @@ export function TablesPage() {
     }
 
     try {
-      const result = await getTableStats({ databaseInstanceId });
-      setData(result);
+      const [tableStatsResult, findingsResult] = await Promise.all([
+        getTableStats({ databaseInstanceId }),
+        listFindings({ status: 'open', range: FINDINGS_RANGE, limit: FINDINGS_LIMIT, databaseInstanceId }),
+      ]);
+      setData(tableStatsResult);
+      setFindings(findingsResult.findings);
       setError(null);
     } catch (err) {
       const message =
         err instanceof ApiError
-          ? `The Postgresome API returned an error (${err.status}).`
+          ? `The Postgresome API returned an error (${err.status}). Try refreshing.`
           : 'Unable to reach the Postgresome API. Is it running?';
       setError(message);
     } finally {
@@ -62,6 +91,26 @@ export function TablesPage() {
   const loading = data === null && error === null;
 
   const tables = data?.tables ?? [];
+
+  const findingsByTable = new Map<string, DashboardFinding[]>();
+  for (const finding of findings) {
+    if (finding.resource_type !== 'table') continue;
+    const list = findingsByTable.get(finding.resource_name) ?? [];
+    list.push(finding);
+    findingsByTable.set(finding.resource_name, list);
+  }
+
+  const sortedTables = tables
+    .map((table) => {
+      const key = `${table.schema_name}.${table.table_name}`;
+      const tableFindings = findingsByTable.get(key) ?? [];
+      return { table, key, status: tableStatus(tableFindings), finding: topFinding(tableFindings) };
+    })
+    .sort((a, b) => {
+      const rankDiff = STATUS_RANK[a.status] - STATUS_RANK[b.status];
+      if (rankDiff !== 0) return rankDiff;
+      return a.key.localeCompare(b.key);
+    });
 
   return (
     <Layout
@@ -87,67 +136,76 @@ export function TablesPage() {
         tables.length === 0 ? (
           <Card title="Tables">
             <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              No table statistics yet.
+              No table statistics yet — they&apos;ll appear once the Postgresome agent completes its next collection.
             </div>
           </Card>
         ) : (
-          <Card
-            title="Tables"
-            subtitle={data.collected_at ? `Snapshot from ${formatRelativeTime(data.collected_at)}` : undefined}
-          >
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]" style={{ borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Table</th>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Live rows</th>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Dead rows</th>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Index usage</th>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Seq scans</th>
-                    <th className="py-2 pr-4 font-medium" style={{ color: 'var(--text-muted)' }}>Vacuum status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tables.map((table) => {
-                    const ratio = deadRowRatio(table);
-                    const ratioHigh = ratio > DEAD_ROW_WARNING_RATIO;
-                    const lastVacuum = table.last_autovacuum_at ?? table.last_vacuum_at;
-                    const idxUsage = indexUsageRatio(table);
-                    const idxUsageLow =
-                      idxUsage !== null &&
-                      idxUsage < INDEX_USAGE_WARNING_RATIO &&
-                      table.index_scans + table.sequential_scans >= INDEX_USAGE_MIN_SCANS;
-
-                    return (
-                      <tr key={`${table.schema_name}.${table.table_name}`} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                        <td className="py-2 pr-4" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-                          {table.schema_name}.{table.table_name}
-                        </td>
-                        <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
-                          {table.live_rows.toLocaleString()}
-                        </td>
-                        <td className="py-2 pr-4 tabular" style={{ color: ratioHigh ? 'var(--warning)' : 'var(--text-primary)' }}>
-                          {table.dead_rows.toLocaleString()} ({ratio.toFixed(1)}%)
-                        </td>
-                        <td className="py-2 pr-4 tabular" style={{ color: idxUsageLow ? 'var(--warning)' : 'var(--text-primary)' }}>
-                          {idxUsage === null ? '—' : `${idxUsage.toFixed(1)}%`}
-                        </td>
-                        <td className="py-2 pr-4 tabular" style={{ color: 'var(--text-primary)' }}>
-                          {table.sequential_scans.toLocaleString()}
-                        </td>
-                        <td
-                          className="py-2 pr-4"
-                          style={{ color: !lastVacuum && ratioHigh ? 'var(--warning)' : 'var(--text-secondary)' }}
-                        >
-                          {lastVacuum ? formatRelativeTime(lastVacuum) : 'Never'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+          <div className="flex flex-col gap-4">
+            <div className="border-b pb-4" style={{ borderColor: 'var(--border-subtle)' }}>
+              <h2 className="m-0 text-[18px] font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: 'var(--ls-snug)' }}>
+                Table health
+              </h2>
+              <div className="mt-1 max-w-[780px] text-[13px] leading-[1.55]" style={{ color: 'var(--text-muted)' }}>
+                Tables with open findings float to the top. Use this view to see which relations are unhealthy, what
+                triggered the finding, and what fix should come next.
+                {data.collected_at ? ` Snapshot from ${formatRelativeTime(data.collected_at)}.` : ''}
+              </div>
             </div>
-          </Card>
+
+            <Card title="Table review">
+              <div className="flex flex-col">
+                {sortedTables.map(({ table, key, status, finding }, index) => {
+                  const ratio = deadRowRatio(table);
+                  const idxUsage = indexUsageRatio(table);
+
+                  return (
+                    <div key={key} className="py-3" style={{ borderTop: index === 0 ? 'none' : '1px solid var(--border-subtle)' }}>
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm" style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                            {key}
+                          </span>
+                          <StatusBadge status={status} size="sm" />
+                        </div>
+                        {finding && (
+                          <Link
+                            to={`/issues/${finding.id}`}
+                            className="inline-flex h-[var(--control-h-sm)] shrink-0 items-center rounded-[var(--radius-md)] border px-3 text-[13px] font-medium no-underline"
+                            style={{ background: 'var(--surface-raised)', color: 'var(--text-secondary)', borderColor: 'var(--border-default)' }}
+                          >
+                            Investigate
+                          </Link>
+                        )}
+                      </div>
+
+                      {finding && (
+                        <div className="mt-2 flex flex-col gap-1 text-[13px]" style={{ color: 'var(--text-secondary)' }}>
+                          <div>
+                            <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                              Observed problem:{' '}
+                            </span>
+                            {finding.title}
+                          </div>
+                          {finding.recommendation && (
+                            <div>
+                              <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                                Recommended fix:{' '}
+                              </span>
+                              {finding.recommendation}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="mt-2 text-xs tabular" style={{ color: 'var(--text-faint)' }}>
+                        {table.live_rows.toLocaleString()} rows · {ratio.toFixed(1)}% dead · {idxUsage === null ? '—' : `${idxUsage.toFixed(1)}%`} index usage · {table.sequential_scans.toLocaleString()} seq scans
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </div>
         )
       ) : null}
     </Layout>

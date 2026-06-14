@@ -4,26 +4,31 @@ import (
 	"fmt"
 
 	"github.com/okumujustine/postgresome/internal/analysis"
+	"github.com/okumujustine/postgresome/internal/analysis/config"
 	"github.com/okumujustine/postgresome/internal/metrics"
-)
-
-const (
-	highSequentialScanWarningRatio          = 0.50
-	highSequentialScanWarningRowsThreshold  = 100000
-	highSequentialScanCriticalRatio         = 0.80
-	highSequentialScanCriticalRowsThreshold = 1000000
 )
 
 // HighSequentialScanRule detects tables that are scanned sequentially for a
 // large share of reads, which can indicate missing indexes, inefficient
 // queries, large table scans, or reporting/analytics workloads.
-type HighSequentialScanRule struct{}
+type HighSequentialScanRule struct {
+	Config config.RuleConfig
+}
 
 func (r HighSequentialScanRule) Name() string {
-	return "high_sequential_scan"
+	return config.RuleKeyHighSequentialScan
 }
 
 func (r HighSequentialScanRule) Analyze(snapshot metrics.TableStatsSnapshot) []analysis.Finding {
+	if !r.Config.Enabled {
+		return nil
+	}
+
+	warningRatio := r.Config.Thresholds["warning_ratio"]
+	warningRows := r.Config.Thresholds["warning_rows"]
+	criticalRatio := r.Config.Thresholds["critical_ratio"]
+	criticalRows := r.Config.Thresholds["critical_rows"]
+
 	findings := make([]analysis.Finding, 0)
 
 	for _, table := range snapshot.Tables {
@@ -35,36 +40,36 @@ func (r HighSequentialScanRule) Analyze(snapshot metrics.TableStatsSnapshot) []a
 		resourceName := fmt.Sprintf("%s.%s", table.SchemaName, table.TableName)
 
 		switch {
-		case sequentialScanRatio >= highSequentialScanCriticalRatio && table.SequentialRowsRead >= highSequentialScanCriticalRowsThreshold:
+		case sequentialScanRatio >= criticalRatio && float64(table.SequentialRowsRead) >= criticalRows:
 			findings = append(findings, analysis.Finding{
 				DetectedAt:         snapshot.CollectedAt,
 				DatabaseInstanceID: snapshot.DatabaseInstanceID,
 				Severity:           "critical",
 				Category:           "queries",
-				Title:              "Critical sequential scan pressure detected",
-				Message:            fmt.Sprintf("Table %s.%s has heavy sequential scan activity and is reading many rows.", table.SchemaName, table.TableName),
-				Recommendation:     "Investigate slow queries and missing indexes for this table.",
+				Title:              r.Config.Title,
+				Message:            r.Config.Description,
+				Recommendation:     r.Config.Recommendation,
 				RuleKey:            r.Name(),
 				ResourceType:       "table",
 				ResourceName:       resourceName,
 				CurrentValue:       sequentialScanRatio,
-				ThresholdValue:     highSequentialScanCriticalRatio,
+				ThresholdValue:     criticalRatio,
 			})
 
-		case sequentialScanRatio >= highSequentialScanWarningRatio && table.SequentialRowsRead >= highSequentialScanWarningRowsThreshold:
+		case sequentialScanRatio >= warningRatio && float64(table.SequentialRowsRead) >= warningRows:
 			findings = append(findings, analysis.Finding{
 				DetectedAt:         snapshot.CollectedAt,
 				DatabaseInstanceID: snapshot.DatabaseInstanceID,
-				Severity:           "warning",
+				Severity:           r.Config.Severity,
 				Category:           "queries",
-				Title:              "High sequential scan activity detected",
-				Message:            fmt.Sprintf("Table %s.%s is using sequential scans for a large share of reads.", table.SchemaName, table.TableName),
-				Recommendation:     "Review query patterns and consider whether frequently filtered columns need indexes.",
+				Title:              r.Config.Title,
+				Message:            r.Config.Description,
+				Recommendation:     r.Config.Recommendation,
 				RuleKey:            r.Name(),
 				ResourceType:       "table",
 				ResourceName:       resourceName,
 				CurrentValue:       sequentialScanRatio,
-				ThresholdValue:     highSequentialScanWarningRatio,
+				ThresholdValue:     warningRatio,
 			})
 		}
 	}

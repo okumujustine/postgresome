@@ -1,57 +1,59 @@
 package rules
 
 import (
-	"fmt"
-
 	"github.com/okumujustine/postgresome/internal/analysis"
+	"github.com/okumujustine/postgresome/internal/analysis/config"
 	"github.com/okumujustine/postgresome/internal/metrics"
-)
-
-const (
-	highRollbackRateWarningThreshold  = 0.05
-	highRollbackRateCriticalThreshold = 0.15
 )
 
 // HighRollbackRateRule detects unhealthy transaction behavior where a large
 // share of transactions are being rolled back instead of committed.
-type HighRollbackRateRule struct{}
+type HighRollbackRateRule struct {
+	Config config.RuleConfig
+}
 
 func (r HighRollbackRateRule) Name() string {
-	return "high_rollback_rate"
+	return config.RuleKeyHighRollbackRate
 }
 
 func (r HighRollbackRateRule) Analyze(stats metrics.DatabaseStats, delta metrics.DatabaseMetricDelta) []analysis.Finding {
+	if !r.Config.Enabled {
+		return nil
+	}
+
 	rate := delta.RollbackRate
+	warningThreshold := r.Config.Thresholds["warning"]
+	criticalThreshold := r.Config.Thresholds["critical"]
 
 	switch {
-	case rate > highRollbackRateCriticalThreshold:
+	case rate > criticalThreshold:
 		return []analysis.Finding{{
 			DetectedAt:         delta.CollectedAt,
 			DatabaseInstanceID: delta.DatabaseInstanceID,
 			Severity:           "critical",
 			Category:           "transactions",
-			Title:              "High transaction rollback rate detected",
-			Message:            "A large percentage of database work is being discarded due to rollbacks.",
-			Recommendation:     "Investigate application failures, constraint violations, deadlocks, or timeout issues.",
+			Title:              r.Config.Title,
+			Message:            r.Config.Description,
+			Recommendation:     r.Config.Recommendation,
 			RuleKey:            r.Name(),
 			ResourceType:       "database",
 			CurrentValue:       rate,
-			ThresholdValue:     highRollbackRateCriticalThreshold,
+			ThresholdValue:     criticalThreshold,
 		}}
 
-	case rate >= highRollbackRateWarningThreshold:
+	case rate >= warningThreshold:
 		return []analysis.Finding{{
 			DetectedAt:         delta.CollectedAt,
 			DatabaseInstanceID: delta.DatabaseInstanceID,
-			Severity:           "warning",
+			Severity:           r.Config.Severity,
 			Category:           "transactions",
-			Title:              "Elevated transaction rollback rate detected",
-			Message:            fmt.Sprintf("%.1f%% of recent database transactions are rolling back.", rate*100),
-			Recommendation:     "Review application errors, failed queries, and transaction handling.",
+			Title:              r.Config.Title,
+			Message:            r.Config.Description,
+			Recommendation:     r.Config.Recommendation,
 			RuleKey:            r.Name(),
 			ResourceType:       "database",
 			CurrentValue:       rate,
-			ThresholdValue:     highRollbackRateWarningThreshold,
+			ThresholdValue:     warningThreshold,
 		}}
 
 	default:

@@ -1,27 +1,27 @@
 package rules
 
 import (
-	"fmt"
-
 	"github.com/okumujustine/postgresome/internal/analysis"
+	"github.com/okumujustine/postgresome/internal/analysis/config"
 	"github.com/okumujustine/postgresome/internal/metrics"
-)
-
-const (
-	lowCacheHitRatioWarningThreshold  = 0.95
-	lowCacheHitRatioCriticalThreshold = 0.90
 )
 
 // LowCacheHitRatioRule detects poor PostgreSQL cache efficiency, which may
 // indicate missing indexes, inefficient queries, or insufficient
 // shared_buffers configuration.
-type LowCacheHitRatioRule struct{}
+type LowCacheHitRatioRule struct {
+	Config config.RuleConfig
+}
 
 func (r LowCacheHitRatioRule) Name() string {
-	return "low_cache_hit_ratio"
+	return config.RuleKeyLowCacheHitRatio
 }
 
 func (r LowCacheHitRatioRule) Analyze(stats metrics.DatabaseStats, delta metrics.DatabaseMetricDelta) []analysis.Finding {
+	if !r.Config.Enabled {
+		return nil
+	}
+
 	// CacheHitRatio is 0 when there was no block activity in this interval
 	// (safeRatio's divide-by-zero case), which is not a sign of poor cache
 	// efficiency. Skip the rule until there is something to evaluate.
@@ -30,36 +30,38 @@ func (r LowCacheHitRatioRule) Analyze(stats metrics.DatabaseStats, delta metrics
 	}
 
 	ratio := delta.CacheHitRatio
+	warningThreshold := r.Config.Thresholds["warning"]
+	criticalThreshold := r.Config.Thresholds["critical"]
 
 	switch {
-	case ratio < lowCacheHitRatioCriticalThreshold:
+	case ratio < criticalThreshold:
 		return []analysis.Finding{{
 			DetectedAt:         delta.CollectedAt,
 			DatabaseInstanceID: delta.DatabaseInstanceID,
 			Severity:           "critical",
 			Category:           "cache",
-			Title:              "Low cache hit ratio detected",
-			Message:            fmt.Sprintf("PostgreSQL is reading frequently from disk. Current cache hit ratio is %.1f%%.", ratio*100),
-			Recommendation:     "Investigate missing indexes, inefficient queries, and shared_buffers configuration.",
+			Title:              r.Config.Title,
+			Message:            r.Config.Description,
+			Recommendation:     r.Config.Recommendation,
 			RuleKey:            r.Name(),
 			ResourceType:       "database",
 			CurrentValue:       ratio,
-			ThresholdValue:     lowCacheHitRatioCriticalThreshold,
+			ThresholdValue:     criticalThreshold,
 		}}
 
-	case ratio < lowCacheHitRatioWarningThreshold:
+	case ratio < warningThreshold:
 		return []analysis.Finding{{
 			DetectedAt:         delta.CollectedAt,
 			DatabaseInstanceID: delta.DatabaseInstanceID,
-			Severity:           "warning",
+			Severity:           r.Config.Severity,
 			Category:           "cache",
-			Title:              "Reduced cache efficiency detected",
-			Message:            fmt.Sprintf("PostgreSQL cache hit ratio is currently %.1f%%.", ratio*100),
-			Recommendation:     "Review query patterns, indexes, and memory configuration.",
+			Title:              r.Config.Title,
+			Message:            r.Config.Description,
+			Recommendation:     r.Config.Recommendation,
 			RuleKey:            r.Name(),
 			ResourceType:       "database",
 			CurrentValue:       ratio,
-			ThresholdValue:     lowCacheHitRatioWarningThreshold,
+			ThresholdValue:     warningThreshold,
 		}}
 
 	default:

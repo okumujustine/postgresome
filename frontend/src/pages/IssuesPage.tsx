@@ -105,7 +105,7 @@ export function IssuesPage() {
       } catch (err) {
         const message =
           err instanceof ApiError
-            ? `The Postgresome API returned an error (${err.status}).`
+            ? `The Postgresome API returned an error (${err.status}). Try refreshing.`
             : 'Unable to reach the Postgresome API. Is it running?';
         setError(message);
       } finally {
@@ -142,101 +142,115 @@ export function IssuesPage() {
         </div>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
-        <div className="flex items-center gap-1">
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => {
-                setStatus(tab.value);
-                setOffset(0);
-              }}
-              className="relative cursor-pointer border-0 bg-transparent px-3 py-2 text-[13.5px] font-semibold"
-              style={{ color: status === tab.value ? 'var(--text-primary)' : 'var(--text-muted)' }}
-            >
-              {tab.label}
-              {status === tab.value && (
-                <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] rounded-[1px]" style={{ background: 'var(--accent)' }} />
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="mb-2 flex flex-wrap items-center gap-[10px]">
-          <FilterSelect
-            value={severity}
-            onChange={(value) => {
-              setSeverity(value);
-              setOffset(0);
-            }}
-            options={SEVERITY_OPTIONS}
-          />
-          <FilterSelect
-            value={category}
-            onChange={(value) => {
-              setCategory(value);
-              setOffset(0);
-            }}
-            options={CATEGORY_OPTIONS}
-          />
-        </div>
-      </div>
-
       {loading && !data ? (
         <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
           <Search size={14} className="animate-pulse" />
           Loading issues…
         </div>
       ) : data ? (
-        <Card
-          title={status === 'open' ? 'Open issues' : 'Resolved issues'}
-          subtitle={`${total} issue${total === 1 ? '' : 's'} · ${counts.critical} critical · ${counts.warning} warning · ${counts.info} info`}
-        >
-          {findings.length === 0 ? (
-            <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              {status === 'open' ? 'No open issues match these filters — nice work.' : 'No resolved issues match these filters.'}
+        <>
+          <section className="mb-5 border-b pb-4" style={{ borderColor: 'var(--border-subtle)' }}>
+            <div className="max-w-[820px]">
+              <h2 className="m-0 text-[18px] font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: 'var(--ls-snug)' }}>
+                Diagnosis queue
+              </h2>
+              <div className="mt-1 text-[13px] leading-[1.55]" style={{ color: 'var(--text-muted)' }}>
+                Track open and resolved findings by subsystem. Start with critical items, verify the evidence, and move
+                into the issue detail when you are ready to fix.
+              </div>
             </div>
-          ) : (
-            <>
-              <div className="flex flex-col">
-                {findings.map((finding, index) => (
-                  <div key={finding.id} style={{ borderTop: index === 0 ? 'none' : '1px solid var(--border-subtle)' }}>
-                    <IssueRow finding={finding} />
-                  </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-1">
+                {STATUS_TABS.map((tab) => (
+                  <button
+                    key={tab.value}
+                    onClick={() => {
+                      setStatus(tab.value);
+                      setOffset(0);
+                    }}
+                    className="relative cursor-pointer border-0 bg-transparent px-3 py-2 text-[13.5px] font-semibold"
+                    style={{ color: status === tab.value ? 'var(--text-primary)' : 'var(--text-muted)' }}
+                  >
+                    {tab.label}
+                    {status === tab.value && (
+                      <span className="absolute bottom-[-1px] left-0 right-0 h-[2px] rounded-[1px]" style={{ background: 'var(--accent)' }} />
+                    )}
+                  </button>
                 ))}
               </div>
 
-              <div
-                className="mt-4 flex items-center justify-between gap-3 border-t pt-4"
-                style={{ borderColor: 'var(--border-subtle)' }}
-              >
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Showing {rangeStart}–{rangeEnd} of {total}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                    disabled={offset === 0}
-                    className="inline-flex h-[var(--control-h-sm)] items-center gap-1 rounded-[var(--radius-md)] border px-3 text-[13px] disabled:cursor-not-allowed disabled:opacity-40"
-                    style={{ background: 'var(--surface-raised)', color: 'var(--text-secondary)', borderColor: 'var(--border-default)' }}
-                  >
-                    <ChevronLeft size={14} />
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setOffset(offset + PAGE_SIZE)}
-                    disabled={offset + PAGE_SIZE >= total}
-                    className="inline-flex h-[var(--control-h-sm)] items-center gap-1 rounded-[var(--radius-md)] border px-3 text-[13px] disabled:cursor-not-allowed disabled:opacity-40"
-                    style={{ background: 'var(--surface-raised)', color: 'var(--text-secondary)', borderColor: 'var(--border-default)' }}
-                  >
-                    Next
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
+              <div className="flex flex-wrap items-center gap-[10px]">
+                <FilterSelect
+                  value={severity}
+                  onChange={(value) => {
+                    setSeverity(value);
+                    setOffset(0);
+                  }}
+                  options={SEVERITY_OPTIONS}
+                />
+                <FilterSelect
+                  value={category}
+                  onChange={(value) => {
+                    setCategory(value);
+                    setOffset(0);
+                  }}
+                  options={CATEGORY_OPTIONS}
+                />
               </div>
-            </>
-          )}
-        </Card>
+            </div>
+          </section>
+
+          <Card
+            title={status === 'open' ? 'Open issues' : 'Resolved issues'}
+            subtitle={`${total} issue${total === 1 ? '' : 's'} · ${counts.critical} critical · ${counts.warning} warning · ${counts.info} info`}
+          >
+            {findings.length === 0 ? (
+              <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                {status === 'open' ? 'No open issues match these filters — nice work.' : 'No resolved issues match these filters.'}
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-col">
+                  {findings.map((finding, index) => (
+                    <div key={finding.id} style={{ borderTop: index === 0 ? 'none' : '1px solid var(--border-subtle)' }}>
+                      <IssueRow finding={finding} />
+                    </div>
+                  ))}
+                </div>
+
+                <div
+                  className="mt-4 flex items-center justify-between gap-3 border-t pt-4"
+                  style={{ borderColor: 'var(--border-subtle)' }}
+                >
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Showing {rangeStart}–{rangeEnd} of {total}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                      disabled={offset === 0}
+                      className="inline-flex h-[var(--control-h-sm)] items-center gap-1 rounded-[var(--radius-md)] border px-3 text-[13px] disabled:cursor-not-allowed disabled:opacity-40"
+                      style={{ background: 'var(--surface-raised)', color: 'var(--text-secondary)', borderColor: 'var(--border-default)' }}
+                    >
+                      <ChevronLeft size={14} />
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setOffset(offset + PAGE_SIZE)}
+                      disabled={offset + PAGE_SIZE >= total}
+                      className="inline-flex h-[var(--control-h-sm)] items-center gap-1 rounded-[var(--radius-md)] border px-3 text-[13px] disabled:cursor-not-allowed disabled:opacity-40"
+                      style={{ background: 'var(--surface-raised)', color: 'var(--text-secondary)', borderColor: 'var(--border-default)' }}
+                    >
+                      Next
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </Card>
+        </>
       ) : null}
     </Layout>
   );

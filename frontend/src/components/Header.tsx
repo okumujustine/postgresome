@@ -25,8 +25,8 @@ export function Header({ title, range, onRangeChange, onRefresh, refreshing }: H
 
   return (
     <header
-      className="psm-header sticky top-0 z-20 flex shrink-0 items-center gap-[14px] border-b px-5 backdrop-blur-sm"
-      style={{ height: 'var(--header-h)', borderColor: 'var(--border-subtle)', background: 'color-mix(in srgb, var(--bg-base) 82%, transparent)' }}
+      className="psm-header sticky top-0 z-20 flex shrink-0 items-center gap-[14px] border-b px-5"
+      style={{ height: 'var(--header-h)', borderColor: 'var(--border-subtle)', background: 'color-mix(in srgb, var(--bg-base) 92%, transparent)' }}
     >
       <div className="flex min-w-0 items-center gap-[11px]">
         <h1 className="m-0 truncate text-base font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: 'var(--ls-snug)' }}>
@@ -40,9 +40,9 @@ export function Header({ title, range, onRangeChange, onRefresh, refreshing }: H
               <select
                 value={selectedId}
                 onChange={(event) => setSelectedId(event.target.value)}
-                className="h-[28px] cursor-pointer appearance-none rounded-[var(--radius-pill)] border pr-7 pl-[28px] text-[12.5px] outline-none"
+                className="h-[28px] cursor-pointer appearance-none rounded-[var(--radius-md)] border pr-7 pl-[28px] text-[12.5px] outline-none"
                 style={{
-                  background: 'var(--surface-card)',
+                  background: 'var(--surface-raised)',
                   borderColor: 'var(--border-subtle)',
                   color: 'var(--text-secondary)',
                   fontFamily: 'var(--font-mono)',

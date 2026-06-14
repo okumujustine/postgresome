@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Clock, Database, OctagonAlert, Search, Server } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, Search } from 'lucide-react';
 import { listFindings } from '../api/findings';
 import { getTableStats } from '../api/tables';
 import { ApiError } from '../api/client';
-import type { FindingsListResponse } from '../types/dashboard';
+import type { FindingsListResponse, MetricRange } from '../types/dashboard';
 import type { TableStatsResponse } from '../types/tables';
 import { Layout } from '../components/Layout';
-import { Card } from '../components/Card';
-import { MetricCard } from '../components/MetricCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { HealthIssueCard } from '../components/HealthIssueCard';
 import { formatRelativeTimeShort } from '../lib/format';
@@ -16,6 +15,11 @@ import { useDatabaseInstance } from '../lib/databaseInstance';
 const NEEDS_ATTENTION_LIMIT = 5;
 
 const SEVERITY_RANK: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+
+// Issues are an open-ended tracker, not a time-series view — use the widest
+// available range so open issues aren't hidden by a short window (same
+// rationale as ISSUES_RANGE in IssuesPage.tsx).
+const HEALTH_FINDINGS_RANGE: MetricRange = '7d';
 
 export function HealthPage() {
   const [data, setData] = useState<FindingsListResponse | null>(null);
@@ -31,7 +35,7 @@ export function HealthPage() {
 
     try {
       const [findingsResult, tableStatsResult] = await Promise.all([
-        listFindings({ status: 'open', limit: 50, databaseInstanceId }),
+        listFindings({ status: 'open', range: HEALTH_FINDINGS_RANGE, limit: 50, databaseInstanceId }),
         getTableStats({ databaseInstanceId }),
       ]);
       setData(findingsResult);
@@ -40,7 +44,7 @@ export function HealthPage() {
     } catch (err) {
       const message =
         err instanceof ApiError
-          ? `The Postgresome API returned an error (${err.status}).`
+          ? `The Postgresome API returned an error (${err.status}). Try refreshing.`
           : 'Unable to reach the Postgresome API. Is it running?';
       setError(message);
     } finally {
@@ -69,13 +73,6 @@ export function HealthPage() {
     })
     .slice(0, NEEDS_ATTENTION_LIMIT);
 
-  let statusSummary = 'All checks passing';
-  if (counts.critical > 0) {
-    statusSummary = `${counts.critical} critical issue${counts.critical === 1 ? '' : 's'} need attention`;
-  } else if (counts.warning > 0) {
-    statusSummary = `${counts.warning} warning${counts.warning === 1 ? '' : 's'} found`;
-  }
-
   return (
     <Layout title="Health" onRefresh={() => load(selectedId, true)} refreshing={refreshing}>
       {error && (
@@ -93,10 +90,13 @@ export function HealthPage() {
           Checking database health…
         </div>
       ) : data ? (
-        <div className="flex flex-col gap-5">
-          <Card title="Database status">
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-col gap-6">
+          <section
+            className="grid gap-4 border-b pb-5 md:grid-cols-[minmax(0,1.35fr)_minmax(260px,0.85fr)]"
+            style={{ borderColor: 'var(--border-subtle)' }}
+          >
+            <div>
+              <div className="mb-2 flex flex-wrap items-center gap-3">
                 <h2
                   className="m-0 text-[var(--fs-h1)] font-semibold"
                   style={{ color: 'var(--text-primary)', letterSpacing: 'var(--ls-tight)', fontFamily: 'var(--font-mono)' }}
@@ -105,47 +105,81 @@ export function HealthPage() {
                 </h2>
                 <StatusBadge status={instance.status} />
               </div>
-              <div className="flex flex-wrap items-center gap-4">
-                <span className="inline-flex items-center gap-[6px] text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
-                  <Server size={13} />
-                  <span style={{ fontFamily: 'var(--font-mono)' }}>{instance.host}</span>
-                </span>
-                <span className="inline-flex items-center gap-[6px] text-[12.5px]" style={{ color: 'var(--text-muted)' }}>
-                  <Database size={13} />
-                  <span style={{ fontFamily: 'var(--font-mono)' }}>{instance.id}</span>
-                </span>
+              <div className="max-w-[760px] text-[14px] leading-[1.6]" style={{ color: 'var(--text-secondary)' }}>
+                {total === 0
+                  ? 'No open issues are currently blocking this database. Keep monitoring for new findings.'
+                  : `${total} open issue${total === 1 ? '' : 's'} need review. Start with the highest-severity findings, confirm the evidence, and then apply the recommended fix.`}
               </div>
-              <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                {statusSummary}
+              {total > 0 && (
+                <div className="mt-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+                  {counts.critical} critical · {counts.warning} warning · {counts.info} informational
+                </div>
+              )}
+              <div className="mt-2 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+                Last analyzed {tableStats?.collected_at ? formatRelativeTimeShort(tableStats.collected_at) : '—'}
+                {instance.host && (
+                  <>
+                    {' · '}
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{instance.host}</span>
+                  </>
+                )}
               </div>
             </div>
-          </Card>
 
-          <div className="grid gap-[14px]" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-            <MetricCard label="Open issues" value={total.toString()} icon={<AlertTriangle size={14} />} hideFooter />
-            <MetricCard label="Critical" value={counts.critical.toString()} icon={<OctagonAlert size={14} />} hideFooter />
-            <MetricCard label="Warnings" value={counts.warning.toString()} icon={<AlertTriangle size={14} />} hideFooter />
-            <MetricCard
-              label="Last checked"
-              value={tableStats?.collected_at ? formatRelativeTimeShort(tableStats.collected_at) : '—'}
-              icon={<Clock size={14} />}
-              hideFooter
-            />
-          </div>
-
-          <Card title="Needs attention" subtitle={total === 0 ? undefined : `${total} open issue${total === 1 ? '' : 's'}`}>
-            {needsAttention.length === 0 ? (
-              <div className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                No issues need attention — all checks passing.
+            <div
+              className="rounded-[var(--radius-lg)] border px-4 py-3"
+              style={{ borderColor: 'var(--border-subtle)', background: 'var(--surface-raised)' }}
+            >
+              <div className="text-[12px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                Next step
               </div>
-            ) : (
+              <div className="mt-1 text-[14px] leading-[1.55]" style={{ color: 'var(--text-secondary)' }}>
+                {total === 0
+                  ? 'No remediation work is queued right now.'
+                  : counts.critical > 0
+                    ? 'Review the critical issues first. They are the fastest path to reducing time to fix.'
+                    : 'Review the warning issues below and confirm which ones are still affecting production.'}
+              </div>
+              {total > 0 && (
+                <Link
+                  to="/issues"
+                  className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium no-underline"
+                  style={{ color: 'var(--text-link)' }}
+                >
+                  Open full issue queue
+                  <ArrowRight size={14} />
+                </Link>
+              )}
+            </div>
+          </section>
+
+          {needsAttention.length > 0 && (
+            <section>
+              <div className="mb-3">
+                <h3 className="m-0 text-[18px] font-semibold" style={{ color: 'var(--text-primary)', letterSpacing: 'var(--ls-snug)' }}>
+                  Priority issues
+                </h3>
+                <div className="mt-1 text-[13px]" style={{ color: 'var(--text-muted)' }}>
+                  Each issue shows the problem, the evidence behind it, and the recommended fix.
+                </div>
+              </div>
               <div className="flex flex-col gap-3">
                 {needsAttention.map((finding) => (
                   <HealthIssueCard key={finding.id} finding={finding} />
                 ))}
               </div>
-            )}
-          </Card>
+              {total > NEEDS_ATTENTION_LIMIT && (
+                <Link
+                  to="/issues"
+                  className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium no-underline"
+                  style={{ color: 'var(--text-link)' }}
+                >
+                  View all {total} open issues
+                  <ArrowRight size={14} />
+                </Link>
+              )}
+            </section>
+          )}
         </div>
       ) : null}
     </Layout>

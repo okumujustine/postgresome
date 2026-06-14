@@ -1,224 +1,213 @@
-Yes. Here is the roadmap I have in mind for **Postgresome**.
+# Postgresome Roadmap
 
-## Phase 1: Local agent foundation ✅
+This roadmap reflects Postgresome's diagnosis-first direction.
 
-Done / mostly done:
+Postgresome is not trying to become another Grafana, Datadog, or generic PostgreSQL metrics dashboard.
 
-```text
-Agent runs locally
-Connects to PostgreSQL
-Collects pg_stat_database
-Collects pg_stat_activity
-Calculates deltas
-Converts metrics to MetricPoints
-Runs analyzer rules
-Prints findings
-```
+The product we are building is a database doctor.
 
-Current intelligence:
+## Product goal
 
-```text
-High connections
-Low cache hit ratio
-High rollback rate
-Idle connections
-Long running queries
-Blocked queries
-```
+Reduce time to fix PostgreSQL problems by turning raw signals into:
 
-## Phase 2: Table health
+- diagnosis
+- evidence
+- impact
+- historical context
+- suggested action
 
-Next:
+## Product principles
 
-```text
-pg_stat_user_tables
-```
+1. Metrics are evidence, not the product.
+2. Historical data exists to explain change over time, not to fill screens with charts.
+3. The agent collects signals. The backend interprets them.
+4. Every collected metric must justify itself through a diagnosis use case.
+5. The default UI experience starts with problems, not dashboards.
+
+## What we are not building first
+
+Do not prioritize:
+
+- configurable dashboard builders
+- chart-heavy monitoring surfaces
+- infra-monitoring clones
+- broad observability features without diagnosis value
+
+## Diagnosis-first architecture
+
+### Agent responsibilities
+
+The agent should stay lightweight and focus on collection.
+
+Collect:
+
+- `pg_stat_database`
+- `pg_stat_activity`
+- `pg_stat_user_tables`
+- `pg_stat_statements`
+- lock signals
+- vacuum signals
+- index-usage signals
+- query performance evidence
+
+Do not put diagnosis logic in the agent.
+
+### Backend responsibilities
+
+The backend should:
+
+- persist raw evidence in TimescaleDB
+- compare current metrics with historical baselines
+- detect anomalies and degradation
+- correlate related events
+- produce findings and recommendations
+- compute health summaries from diagnoses
+
+### TimescaleDB responsibilities
+
+TimescaleDB is the historical memory layer for diagnosis.
+
+Its job is to preserve enough evidence to answer:
+
+- what changed?
+- when did it start?
+- is this abnormal for this database?
+- what other signals moved at the same time?
+
+## MVP diagnosis categories
+
+The first MVP should focus on these categories:
+
+1. Connection issues
+2. Slow queries
+3. Table bloat
+4. Missing indexes
+5. Cache problems
+6. Vacuum problems
+7. Lock contention
+
+## Phase 1: Lightweight collection foundation
 
 Goal:
 
-Detect:
+Establish the minimal signal pipeline needed for diagnosis.
+
+Includes:
+
+- agent registration
+- metric ingestion
+- database activity collection
+- table statistics collection
+- query statistics collection
+- finding ingestion and persistence
+
+Success looks like:
 
 ```text
-dead tuples
-autovacuum not keeping up
-heavy updates/deletes
-sequential scan pressure
-table-level health problems
+Postgresome can collect evidence continuously without making users think about the collection system.
 ```
 
-Rules:
-
-```text
-HighDeadRowsRule
-AutovacuumLagRule
-HighSequentialScanRule
-```
-
-## Phase 3: Query performance
-
-Then:
-
-```text
-pg_stat_statements
-```
+## Phase 2: Diagnosis engine maturity
 
 Goal:
 
-Find top expensive queries.
+Turn raw evidence into meaningful findings.
 
-Detect:
+Focus areas:
 
-```text
-slow queries
-frequently executed queries
-high total time
-high mean time
-high rows scanned
-```
+- connection issues
+- lock contention
+- slow queries
+- cache pressure
+- vacuum lag
+- table bloat
+- missing index candidates
 
-This is where Postgresome becomes really useful.
-
-## Phase 4: EXPLAIN analysis
-
-Then:
+Success looks like:
 
 ```text
-EXPLAIN (FORMAT JSON)
+The backend can explain a problem in terms of cause, evidence, and suggested action.
 ```
+
+## Phase 3: Historical reasoning in TimescaleDB
 
 Goal:
 
-Analyze selected queries.
+Use historical storage for diagnosis, not just retention.
 
-Detect:
+Add:
 
-```text
-sequential scans
-missing index candidates
-expensive sorts
-nested loops
-bad row estimates
-```
+- baseline comparisons
+- degradation detection
+- anomaly detection
+- before/after analysis
+- correlation across related signals
 
-This becomes the “Postgres expert” part.
-
-## Phase 5: Storage layer
-
-Then we add:
+Success looks like:
 
 ```text
-Postgresome Cloud DB
-TimescaleDB
-dimension/fact schema
+Postgresome can say not only what is wrong now, but what changed and when it started getting worse.
 ```
 
-Tables:
+## Phase 4: Diagnosis-first API surfaces
+
+Goal:
+
+Expose diagnosis-oriented backend responses.
+
+Prioritize endpoints that support:
+
+- database health overview
+- findings queue
+- issue detail
+- evidence retrieval
+- table diagnosis context
+- query diagnosis context
+
+Raw metric query endpoints remain useful, but as supporting evidence surfaces.
+
+## Phase 5: Diagnosis-first frontend
+
+Goal:
+
+Present the product as a PostgreSQL investigation workflow.
+
+Frontend order of importance:
+
+1. Health overview
+2. Current problems
+3. Root cause explanation
+4. Evidence
+5. Suggested fixes
+6. Historical charts when they help explain change
+
+Success looks like:
 
 ```text
-dim_agents
-dim_database_instances
-fact_metric_points
-fact_metric_deltas
-fact_findings
-fact_query_stats
+Users land in Postgresome and immediately understand what needs attention and why.
 ```
 
-Now metrics survive restarts and can power charts.
+## Phase 6: Explainability and confidence
 
-## Phase 6: API
+Goal:
 
-Then build API:
+Make recommendations more actionable and trustworthy.
+
+Add:
+
+- confidence scoring
+- stronger evidence summaries
+- clearer impact statements
+- better recommendation templates
+- links between related findings
+- before/after verification of fixes
+
+## Immediate execution filter
+
+Before adding any new collector, endpoint, schema field, or UI module, ask:
 
 ```text
-GET /metrics/catalog
-GET /dimensions/catalog
-GET /metrics/query
-GET /findings
-POST /agent/heartbeat
-POST /agent/metrics
+What diagnosis does this help us make?
 ```
 
-The agent sends data to the API.
-
-## Phase 7: Dashboard UI
-
-Then connect frontend:
-
-```text
-Overview dashboard
-Custom dashboard builder
-Metric cards
-Line charts
-Bar charts
-Pie charts
-Findings page
-Agents page
-Database instances page
-Query performance page
-```
-
-## Phase 8: Docker agent
-
-Package the agent:
-
-```text
-docker run postgresome/agent
-```
-
-Then later:
-
-```text
-Helm chart for Kubernetes
-```
-
-## Phase 9: Recommendations engine
-
-Improve findings into real recommendations:
-
-```text
-problem
-evidence
-confidence
-suggested SQL
-risk level
-before/after tracking
-```
-
-Example:
-
-```text
-Missing index likely on orders.user_id
-```
-
-## Phase 10: SaaS/business layer
-
-Later:
-
-```text
-accounts
-teams
-organizations
-billing
-API keys
-agent registration
-RBAC
-alerts
-Slack/email notifications
-```
-
-My recommended order now:
-
-```text
-1. Finish table health
-2. Add query performance
-3. Add EXPLAIN analysis
-4. Add storage with TimescaleDB
-5. Add API
-6. Add frontend
-```
-
-So next immediate step is still:
-
-```text
-POST-009B: implement pg_stat_user_tables collector
-```
+If there is no strong answer, it should not be an MVP priority.

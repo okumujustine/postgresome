@@ -2,9 +2,9 @@ package metrics
 
 import "time"
 
-// MetricPoint represents one metric value in a frontend-friendly format,
-// allowing dashboards to dynamically render cards, charts, and tables
-// without hardcoded fields for every metric.
+// MetricPoint represents one collected metric value. These points are raw
+// evidence for diagnosis and can later be queried for historical analysis,
+// anomaly detection, and supporting charts when needed.
 type MetricPoint struct {
 	Key   string
 	Label string

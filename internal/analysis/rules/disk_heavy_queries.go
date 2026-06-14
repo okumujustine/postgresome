@@ -1,27 +1,30 @@
 package rules
 
 import (
-	"fmt"
-
 	"github.com/okumujustine/postgresome/internal/analysis"
+	"github.com/okumujustine/postgresome/internal/analysis/config"
 	"github.com/okumujustine/postgresome/internal/metrics"
-)
-
-const (
-	diskHeavyQueryWarningReadRatio  = 0.10
-	diskHeavyQueryCriticalReadRatio = 0.30
 )
 
 // DiskHeavyQueryRule detects queries that read a large portion of their
 // blocks from disk rather than the buffer cache, which can indicate missing
 // indexes, inefficient scans, or insufficient cache memory.
-type DiskHeavyQueryRule struct{}
+type DiskHeavyQueryRule struct {
+	Config config.RuleConfig
+}
 
 func (r DiskHeavyQueryRule) Name() string {
-	return "disk_heavy_query"
+	return config.RuleKeyDiskHeavyQuery
 }
 
 func (r DiskHeavyQueryRule) Analyze(snapshot metrics.QueryStatsSnapshot) []analysis.Finding {
+	if !r.Config.Enabled {
+		return nil
+	}
+
+	warningThreshold := r.Config.Thresholds["warning_ratio"]
+	criticalThreshold := r.Config.Thresholds["critical_ratio"]
+
 	findings := make([]analysis.Finding, 0)
 
 	for _, query := range snapshot.Queries {
@@ -31,36 +34,36 @@ func (r DiskHeavyQueryRule) Analyze(snapshot metrics.QueryStatsSnapshot) []analy
 		}
 
 		switch {
-		case diskReadRatio >= diskHeavyQueryCriticalReadRatio:
+		case diskReadRatio >= criticalThreshold:
 			findings = append(findings, analysis.Finding{
 				DetectedAt:         snapshot.CollectedAt,
 				DatabaseInstanceID: snapshot.DatabaseInstanceID,
 				Severity:           "critical",
 				Category:           "queries",
-				Title:              "Critical disk-heavy query detected",
-				Message:            fmt.Sprintf("Query %q reads %.1f%% of its blocks from disk.", previewQuery(query.Query, queryPreviewMaxLength), diskReadRatio*100),
-				Recommendation:     "This query reads a large portion of blocks from disk. Investigate missing indexes, inefficient scans, and memory/cache behavior.",
+				Title:              r.Config.Title,
+				Message:            r.Config.Description,
+				Recommendation:     r.Config.Recommendation,
 				RuleKey:            r.Name(),
 				ResourceType:       "query",
 				ResourceName:       query.QueryID,
 				CurrentValue:       diskReadRatio,
-				ThresholdValue:     diskHeavyQueryCriticalReadRatio,
+				ThresholdValue:     criticalThreshold,
 			})
 
-		case diskReadRatio >= diskHeavyQueryWarningReadRatio:
+		case diskReadRatio >= warningThreshold:
 			findings = append(findings, analysis.Finding{
 				DetectedAt:         snapshot.CollectedAt,
 				DatabaseInstanceID: snapshot.DatabaseInstanceID,
-				Severity:           "warning",
+				Severity:           r.Config.Severity,
 				Category:           "queries",
-				Title:              "Disk-heavy query detected",
-				Message:            fmt.Sprintf("Query %q reads %.1f%% of its blocks from disk.", previewQuery(query.Query, queryPreviewMaxLength), diskReadRatio*100),
-				Recommendation:     "This query reads a large portion of blocks from disk. Investigate missing indexes, inefficient scans, and memory/cache behavior.",
+				Title:              r.Config.Title,
+				Message:            r.Config.Description,
+				Recommendation:     r.Config.Recommendation,
 				RuleKey:            r.Name(),
 				ResourceType:       "query",
 				ResourceName:       query.QueryID,
 				CurrentValue:       diskReadRatio,
-				ThresholdValue:     diskHeavyQueryWarningReadRatio,
+				ThresholdValue:     warningThreshold,
 			})
 		}
 	}

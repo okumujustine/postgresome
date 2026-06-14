@@ -1,64 +1,68 @@
 package rules
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/okumujustine/postgresome/internal/analysis"
+	"github.com/okumujustine/postgresome/internal/analysis/config"
 	"github.com/okumujustine/postgresome/internal/metrics"
 )
 
-const (
-	slowQueryWarningMeanExecutionTimeMs  = 100
-	slowQueryCriticalMeanExecutionTimeMs = 1000
-
-	queryPreviewMaxLength = 80
-)
+const queryPreviewMaxLength = 80
 
 // SlowQueryRule detects individual queries with a high mean execution time,
 // which can indicate missing indexes, inefficient query plans, or queries
 // that need to be rewritten.
-type SlowQueryRule struct{}
+type SlowQueryRule struct {
+	Config config.RuleConfig
+}
 
 func (r SlowQueryRule) Name() string {
-	return "slow_query"
+	return config.RuleKeySlowQuery
 }
 
 func (r SlowQueryRule) Analyze(snapshot metrics.QueryStatsSnapshot) []analysis.Finding {
+	if !r.Config.Enabled {
+		return nil
+	}
+
+	warningThreshold := r.Config.Thresholds["warning_ms"]
+	criticalThreshold := r.Config.Thresholds["critical_ms"]
+
 	findings := make([]analysis.Finding, 0)
 
 	for _, query := range snapshot.Queries {
 		switch {
-		case query.MeanExecutionTimeMs >= slowQueryCriticalMeanExecutionTimeMs:
+		case query.MeanExecutionTimeMs >= criticalThreshold:
 			findings = append(findings, analysis.Finding{
 				DetectedAt:         snapshot.CollectedAt,
 				DatabaseInstanceID: snapshot.DatabaseInstanceID,
 				Severity:           "critical",
 				Category:           "queries",
-				Title:              "Critical slow query detected",
-				Message:            fmt.Sprintf("Query %q has a mean execution time of %.1f ms.", previewQuery(query.Query, queryPreviewMaxLength), query.MeanExecutionTimeMs),
-				Recommendation:     "Review query execution plan, indexes, joins, and filters.",
+				Title:              r.Config.Title,
+				Message:            r.Config.Description,
+				Recommendation:     r.Config.Recommendation,
 				RuleKey:            r.Name(),
 				ResourceType:       "query",
 				ResourceName:       query.QueryID,
 				CurrentValue:       query.MeanExecutionTimeMs,
-				ThresholdValue:     slowQueryCriticalMeanExecutionTimeMs,
+				ThresholdValue:     criticalThreshold,
 			})
 
-		case query.MeanExecutionTimeMs >= slowQueryWarningMeanExecutionTimeMs:
+		case query.MeanExecutionTimeMs >= warningThreshold:
 			findings = append(findings, analysis.Finding{
 				DetectedAt:         snapshot.CollectedAt,
 				DatabaseInstanceID: snapshot.DatabaseInstanceID,
-				Severity:           "warning",
+				Severity:           r.Config.Severity,
 				Category:           "queries",
-				Title:              "Slow query detected",
-				Message:            fmt.Sprintf("Query %q has a mean execution time of %.1f ms.", previewQuery(query.Query, queryPreviewMaxLength), query.MeanExecutionTimeMs),
-				Recommendation:     "Review query execution plan, indexes, joins, and filters.",
+				Title:              r.Config.Title,
+				Message:            r.Config.Description,
+				Recommendation:     r.Config.Recommendation,
 				RuleKey:            r.Name(),
 				ResourceType:       "query",
 				ResourceName:       query.QueryID,
 				CurrentValue:       query.MeanExecutionTimeMs,
-				ThresholdValue:     slowQueryWarningMeanExecutionTimeMs,
+				ThresholdValue:     warningThreshold,
 			})
 		}
 	}
