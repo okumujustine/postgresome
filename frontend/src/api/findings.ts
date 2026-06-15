@@ -1,9 +1,9 @@
 import { apiGet } from './client';
-import type { FindingsListResponse, MetricRange } from '../types/dashboard';
+import type { MetricRange } from '../types/dashboard';
+import type { IssueDetailResponse, IssueQueueResponse } from '../types/issues';
 
 export interface ListFindingsParams {
-  agentId?: string;
-  databaseInstanceId?: string;
+  databaseInstanceId: string;
   range?: MetricRange;
   severity?: string;
   category?: string;
@@ -12,9 +12,8 @@ export interface ListFindingsParams {
   offset?: number;
 }
 
-export function listFindings(params: ListFindingsParams = {}): Promise<FindingsListResponse> {
-  return apiGet<FindingsListResponse>('/api/findings', {
-    agent_id: params.agentId,
+export function listFindings(params: ListFindingsParams): Promise<IssueQueueResponse> {
+  return apiGet<IssueQueueResponse>('/api/findings', {
     database_instance_id: params.databaseInstanceId,
     range: params.range,
     severity: params.severity,
@@ -24,3 +23,10 @@ export function listFindings(params: ListFindingsParams = {}): Promise<FindingsL
     offset: params.offset !== undefined ? String(params.offset) : undefined,
   });
 }
+
+export function getFinding(id: string, databaseInstanceId: string): Promise<IssueDetailResponse> {
+  return apiGet<IssueDetailResponse>(`/api/findings/${id}`, {
+    database_instance_id: databaseInstanceId,
+  });
+}
+

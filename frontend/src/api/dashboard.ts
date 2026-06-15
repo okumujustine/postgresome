@@ -1,16 +1,11 @@
 import { apiGet } from './client';
-import type { DashboardOverview, MetricRange } from '../types/dashboard';
+import type { DashboardOverviewResponse } from '../types/issues';
+import type { MetricRange } from '../types/dashboard';
 
-export interface DashboardOverviewParams {
-  agentId?: string;
-  databaseInstanceId?: string;
-  range?: MetricRange;
-}
-
-export function getDashboardOverview(params: DashboardOverviewParams = {}): Promise<DashboardOverview> {
-  return apiGet<DashboardOverview>('/api/dashboard/overview', {
-    agent_id: params.agentId,
-    database_instance_id: params.databaseInstanceId,
-    range: params.range,
+export function getDashboardOverview(databaseInstanceId: string, range: MetricRange = '24h') {
+  return apiGet<DashboardOverviewResponse>('/api/dashboard/overview', {
+    database_instance_id: databaseInstanceId,
+    range,
   });
 }
+

@@ -20,3 +20,4 @@ export interface QueryStatsResponse {
   collected_at: string | null;
   queries: QueryStat[];
 }
+

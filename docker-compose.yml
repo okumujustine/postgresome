@@ -1,15 +1,7 @@
-# "Monitored" Postgres instances used for local development / manual
-# testing of the agent and analyzer rules. Started with `make postgres-up`.
-#
-# These live on a shared network ("postgresome") so that the application
-# stack in docker-compose.app.yml (started via `make docker-up`) can reach
-# them by service name.
+# Optional sample PostgreSQL instances for local development and future
+# source-setup experiments. Started with `make postgres-up`.
 
 name: postgresome-db
-
-networks:
-  default:
-    name: postgresome
 
 
 services:

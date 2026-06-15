@@ -23,3 +23,4 @@ export interface TableStatsResponse {
   collected_at: string | null;
   tables: TableStat[];
 }
+

@@ -42,22 +42,19 @@ Review autovacuum configuration or schedule maintenance.
 
 ## Architecture direction
 
-### Agent
+### Source connectors
 
-The agent is a lightweight PostgreSQL signal collector. It gathers raw evidence such as:
+Postgresome should be source-first.
 
-- `pg_stat_database`
-- `pg_stat_activity`
-- `pg_stat_user_tables`
-- `pg_stat_statements`
-- lock information
-- vacuum history and lag signals
-- index usage
-- query performance
+The near-term product should work with PostgreSQL evidence coming from:
 
-The agent should stay lightweight.
+- direct database connections
+- managed provider integrations such as Supabase, Neon, or RDS
 
-It should not be responsible for diagnosis logic.
+All evidence should feed the same backend diagnosis model.
+
+We are intentionally removing the standalone agent runtime for now so the
+product can focus on a simpler connection and diagnosis flow.
 
 ### API / backend
 
@@ -83,7 +80,8 @@ It is Postgresome's historical memory layer. It should support:
 
 The storage model should support:
 
-- `agent_id`
+- `source_id`
+- `source_kind`
 - `database_id`
 - `metric name`
 - dimensions such as table, query, user, lock target, or database
@@ -139,11 +137,25 @@ If a metric cannot help detect, explain, or prove a problem, we should avoid col
 
 ## Current repository direction
 
-The repository already contains the beginnings of this architecture:
+The repository is being simplified around three main surfaces:
 
-- collectors for database, activity, table, and query signals
-- a backend analysis engine that turns evidence into findings
-- TimescaleDB-backed metric storage
-- a frontend that is being repositioned around health, issues, queries, and tables
+- a cloud/backend app that stores evidence and runs diagnosis
+- a diagnosis-first frontend
+- shared PostgreSQL evidence types
 
 The next steps should continue pushing the codebase away from dashboard thinking and toward diagnosis-first product behavior.
+
+For the target long-term flow, see:
+
+- `docs/architecture/diagnosis-platform.md`
+- `docs/architecture/source-to-diagnosis-flow.md`
+
+## Repository layout
+
+- `cloud/` — API and migration entrypoints for the hosted/backend app
+- `cloud/internal/` — cloud/backend-owned API, diagnosis, analysis, storage, and migrations
+- `shared/` — shared evidence and metric types
+- `frontend/` — diagnosis UI
+- `migrations/` — schema changes for the Postgresome storage database
+- `docker/` — remaining local infrastructure assets
+- `docs/` — architecture docs, roadmap, implementation plans, and mockups

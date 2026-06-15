@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { listDatabaseInstances } from '../api/databaseInstances';
 import type { DashboardInstance } from '../types/dashboard';
 import { DATABASE_INSTANCE_STORAGE_KEY, DatabaseInstanceContext } from './databaseInstance';
@@ -24,10 +23,7 @@ export function DatabaseInstanceProvider({ children }: { children: ReactNode }) 
       })
       .catch(() => setInstances([]))
       .finally(() => setLoading(false));
-    // Only run once on mount - selectedId is read from localStorage as the
-    // initial state and validated against the fetched instance list here.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [selectedId]);
 
   const setSelectedId = (id: string) => {
     setSelectedIdState(id);
@@ -40,3 +36,4 @@ export function DatabaseInstanceProvider({ children }: { children: ReactNode }) 
     </DatabaseInstanceContext.Provider>
   );
 }
+

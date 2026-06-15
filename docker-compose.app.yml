@@ -1,16 +1,7 @@
-# The actual Postgresome application stack: its own storage, API, agents,
-# and frontend. Started with `make docker-up`.
-#
-# Joins the "postgresome" network created by docker-compose.yml so the
-# agents here can reach the "monitored" postgres-primary / postgres-secondary
-# instances by service name.
+# The standalone Postgresome application stack: TimescaleDB, backend, and
+# frontend. Started with `make docker-up`.
 
 name: postgresome-app
-
-networks:
-  default:
-    name: postgresome
-    external: true
 
 
 services:
@@ -45,7 +36,7 @@ services:
   migrate:
     build:
       context: .
-      dockerfile: docker/migrate/Dockerfile
+      dockerfile: cloud/migrate/Dockerfile
     container_name: postgresome-migrate
 
     environment:
@@ -59,7 +50,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: docker/api/Dockerfile
+      dockerfile: cloud/api/Dockerfile
     container_name: postgresome-api
     restart: unless-stopped
 
@@ -77,50 +68,10 @@ services:
         condition: service_completed_successfully
 
 
-  agent-primary:
-    build:
-      context: .
-      dockerfile: docker/agent/Dockerfile
-    container_name: postgresome-agent-primary
-    restart: unless-stopped
-
-    environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres-primary:5432/postgresome_test?sslmode=disable
-      AGENT_ID: agent-primary
-      AGENT_NAME: Primary Agent
-      AGENT_ENVIRONMENT: docker
-      POSTGRESOME_API_URL: http://api:9090
-      DATABASE_INSTANCE_ID: db-primary
-
-    depends_on:
-      api:
-        condition: service_started
-
-
-  agent-secondary:
-    build:
-      context: .
-      dockerfile: docker/agent/Dockerfile
-    container_name: postgresome-agent-secondary
-    restart: unless-stopped
-
-    environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres-secondary:5432/postgresome_secondary?sslmode=disable
-      AGENT_ID: agent-secondary
-      AGENT_NAME: Secondary Agent
-      AGENT_ENVIRONMENT: docker
-      POSTGRESOME_API_URL: http://api:9090
-      DATABASE_INSTANCE_ID: db-secondary
-
-    depends_on:
-      api:
-        condition: service_started
-
-
   frontend:
     build:
       context: .
-      dockerfile: docker/frontend/Dockerfile
+      dockerfile: frontend/Dockerfile
       args:
         VITE_API_BASE_URL: http://localhost:9090
     container_name: postgresome-frontend

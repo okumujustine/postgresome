@@ -6,6 +6,9 @@ export interface DashboardInstance {
   id: string;
   database_name: string;
   host: string;
+  source_id?: string;
+  source_kind?: string;
+  provider?: string;
   status: InstanceStatus | string;
 }
 
@@ -24,47 +27,6 @@ export interface DashboardSummary {
   cache_hit_ratio: DashboardMetric;
   rollback_rate: DashboardMetric;
   slow_queries: DashboardMetric;
-}
-
-export interface DashboardFinding {
-  id: string;
-  severity: string;
-  category: string;
-  title: string;
-  message: string;
-  recommendation: string;
-  status: string;
-  rule_key: string;
-  resource_type: string;
-  resource_name: string;
-  current_value: number;
-  threshold_value: number;
-  occurrence_count: number;
-  first_seen_at: string;
-  last_seen_at: string;
-  detected_at: string;
-}
-
-export interface DashboardFindings {
-  critical: number;
-  warning: number;
-  info: number;
-  recent: DashboardFinding[];
-}
-
-export interface DashboardOverview {
-  database_instance: DashboardInstance;
-  summary: DashboardSummary;
-  findings: DashboardFindings;
-}
-
-export interface FindingsListResponse {
-  database_instance: DashboardInstance;
-  severity_counts: { critical: number; warning: number; info: number };
-  total: number;
-  limit: number;
-  offset: number;
-  findings: DashboardFinding[];
 }
 
 export interface MetricQueryPoint {

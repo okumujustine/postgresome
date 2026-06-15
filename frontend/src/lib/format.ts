@@ -8,8 +8,6 @@ export function formatRelativeTime(iso: string): string {
   return `${Math.round(diffHr / 24)}d ago`;
 }
 
-// formatRelativeTimeShort is like formatRelativeTime but reports
-// second-level granularity for very recent timestamps (e.g. "Last checked").
 export function formatRelativeTimeShort(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const diffSec = Math.max(0, Math.round(diffMs / 1000));
@@ -26,8 +24,6 @@ export function formatDuration(ms: number): string {
 
 const PG_BLOCK_SIZE_BYTES = 8192;
 
-// formatBytes converts a count of PostgreSQL 8KB blocks into a human-readable
-// size (KB/MB/GB).
 export function formatBytes(blocks: number): string {
   const bytes = blocks * PG_BLOCK_SIZE_BYTES;
   if (bytes < 1024) return `${bytes} B`;
@@ -36,12 +32,7 @@ export function formatBytes(blocks: number): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-const SEVERITY_EMOJI: Record<string, string> = {
-  critical: '🔴',
-  warning: '🟡',
-  info: '🔵',
-};
-
-export function severityEmoji(severity: string): string {
-  return SEVERITY_EMOJI[severity.toLowerCase()] ?? '⚪';
+export function formatPercent(value: number): string {
+  return `${value.toFixed(1)}%`;
 }
+

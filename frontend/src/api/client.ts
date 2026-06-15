@@ -22,10 +22,10 @@ export async function apiGet<T>(path: string, params?: Record<string, string | u
   }
 
   const response = await fetch(url.toString());
-
   if (!response.ok) {
     throw new ApiError(response.status, `request to ${path} failed with status ${response.status}`);
   }
 
   return response.json() as Promise<T>;
 }
+
