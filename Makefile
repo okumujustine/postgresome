@@ -4,11 +4,12 @@ PRIMARY_DB_URL=postgres://postgres:postgres@localhost:55432/postgresome_test?ssl
 SECONDARY_DB_URL=postgres://postgres:postgres@localhost:55433/postgresome_secondary?sslmode=disable
 POSTGRESOME_DB_URL=postgres://postgres:postgres@localhost:55434/postgresome_app?sslmode=disable
 POSTGRESOME_API_URL=http://localhost:9090
+POSTGRESOME_SECRET_KEY=postgresome-dev-secret-key
 
 .PHONY: run-api
 run-api:
 	@echo "Starting API server..."
-	POSTGRESOME_DATABASE_URL="$(POSTGRESOME_DB_URL)" go run ./cloud/api
+	cd backend && POSTGRESOME_DATABASE_URL="$(POSTGRESOME_DB_URL)" POSTGRESOME_SECRET_KEY="$(POSTGRESOME_SECRET_KEY)" go run ./api
 
 
 .PHONY: run-frontend
@@ -20,7 +21,7 @@ run-frontend:
 .PHONY: migrate
 migrate:
 	@echo "Running database migrations..."
-	POSTGRESOME_DATABASE_URL="$(POSTGRESOME_DB_URL)" go run ./cloud/migrate
+	cd backend && POSTGRESOME_DATABASE_URL="$(POSTGRESOME_DB_URL)" go run ./migrate
 
 
 .PHONY: postgres-up
@@ -49,6 +50,12 @@ docker-up:
 	docker compose -f docker-compose.app.yml up -d --build
 
 
+.PHONY: docker-frontend-reset
+docker-frontend-reset:
+	docker compose -f docker-compose.app.yml rm -sf frontend
+	docker compose -f docker-compose.app.yml up -d --build frontend
+
+
 .PHONY: dev-reset
 dev-reset:
 	docker compose -f docker-compose.app.yml down -v
@@ -67,19 +74,19 @@ docker-logs:
 
 .PHONY: tidy
 tidy:
-	go mod tidy
+	cd backend && go mod tidy
 
 
 .PHONY: test
 test:
-	go test ./...
+	cd backend && go test ./...
 
 
 .PHONY: build-api
 build-api:
-	go build -o bin/api ./cloud/api
+	cd backend && go build -o bin/api ./api
 
 
 .PHONY: clean
 clean:
-	rm -rf bin
+	rm -rf backend/bin

@@ -1,247 +1,320 @@
-import { BookText, TriangleAlert, Wrench } from 'lucide-react';
-import type { ReactNode } from 'react';
-import type { IssueDetailResponse } from '../types/issues';
-import { formatRelativeTime } from '../lib/format';
-import { SeverityBadge, VerificationBadge } from './status-badges';
-import { Badge } from './ui/badge';
-import { DetailCard } from './ui/card';
+import { ArrowRight, Database, FileSearch, Gauge, ShieldAlert } from "lucide-react";
+import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  formatDurationMs,
+  formatNumber,
+  formatPercent,
+  formatRelativeTime,
+  formatTimestamp,
+  severityLabel,
+} from "@/lib/format";
+import type { FindingDetailResponse } from "@/types/api";
 
-export function FindingDetail({ detail }: { detail: IssueDetailResponse }) {
-  const finding = detail.finding;
-  const likelyCause = buildLikelyCause(detail);
-  const evidenceItems = detail.evidence ?? [];
-  const timeline = buildTimeline(detail);
-
-  return (
-    <div className="space-y-5">
-      <DetailCard
-        title={finding.problem_summary || finding.title}
-        description={finding.impact_summary || 'Postgresome thinks this issue is affecting database behavior right now.'}
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <SeverityBadge severity={finding.severity} />
-            <VerificationBadge status={finding.verification_status} />
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="neutral">{finding.category}</Badge>
-            <Badge variant="neutral">
-              {finding.resource_type}: {finding.resource_name}
-            </Badge>
-            <Badge variant="neutral">Seen {finding.occurrence_count} times</Badge>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-4">
-            <EvidenceStat label="Started" value={formatRelativeTime(finding.first_seen_at)} />
-            <EvidenceStat label="Impact" value={finding.severity === 'critical' ? 'High' : finding.severity === 'warning' ? 'Medium' : 'Watch'} />
-            <EvidenceStat label="Scope" value={friendlyScope(finding.resource_type, finding.resource_name)} />
-            <EvidenceStat label="Confidence" value={finding.confidence_label || 'High'} />
-          </div>
-        </div>
-      </DetailCard>
-
-      <DetailCard title="Diagnosis" description="A single reading path: issue, explanation, evidence, and next step.">
-        <div className="space-y-4">
-          <InlinePanel icon={<BookText size={15} />} title="What happened" body={describeWhatHappened(detail)} />
-
-          {evidenceItems.length > 0 ? (
-            <div className="space-y-3">
-              {evidenceItems.map((item) => (
-                <EvidenceRow
-                  key={item.id}
-                  label={item.label}
-                  role={item.role}
-                  summary={item.summary}
-                  currentValue={formatEvidenceValue(item.current_value)}
-                  baselineValue={item.baseline_value ? formatEvidenceValue(item.baseline_value) : undefined}
-                  changePercent={item.change_percent}
-                  referenceId={item.reference_id}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="grid gap-3 md:grid-cols-3">
-              {buildEvidenceRows(detail).map((item) => (
-                <EvidenceStat key={item.label} label={item.label} value={item.value} />
-              ))}
-            </div>
-          )}
-
-          <InlinePanel icon={<TriangleAlert size={15} />} title="Likely cause" body={likelyCause} />
-
-          <InlinePanel
-            icon={<Wrench size={15} />}
-            title="Recommended next step"
-            body={finding.suggested_action || finding.recommendation || 'Inspect the related workload and verify whether the triggering signal is still rising.'}
-          />
-
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] px-4 py-4">
-            <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">Verify after the change</div>
-            <div className="mt-2 text-[13px] leading-6 text-[var(--body)]">
-              {finding.verification_hint || 'Confirm the evidence trends back toward baseline and the issue stops recurring.'}
-            </div>
-          </div>
-        </div>
-      </DetailCard>
-
-      <DetailCard title="Evidence trail" description="Only the extra context you may want if you need one step more depth.">
-        <div className="space-y-3">
-          {timeline.map((item) => (
-            <div key={item.label} className="flex gap-4 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-4">
-              <div className="min-w-[88px] text-[12px] font-medium text-[var(--muted-foreground)]">{item.time}</div>
-              <div>
-                <div className="text-[14px] font-medium text-[var(--foreground)]">{item.label}</div>
-                <div className="mt-1 text-[13px] leading-6 text-[var(--muted-foreground)]">{item.note}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </DetailCard>
-    </div>
-  );
-}
-
-function EvidenceStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-4">
-      <div className="text-[12px] font-semibold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">{label}</div>
-      <div className="mt-2 text-[14px] font-medium text-[var(--foreground)]">{value}</div>
-    </div>
-  );
-}
-
-function InlinePanel({ icon, title, body }: { icon: ReactNode; title: string; body: string }) {
-  return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--muted)] p-4">
-      <div className="mb-2 flex items-center gap-2 text-[14px] font-medium text-[var(--foreground)]">
-        {icon}
-        {title}
-      </div>
-      <p className="text-[13px] leading-6 text-[var(--body)]">{body}</p>
-    </div>
-  );
-}
-
-function EvidenceRow({
+function DetailSection({
   label,
-  role,
-  summary,
-  currentValue,
-  baselineValue,
-  changePercent,
-  referenceId,
+  title,
+  children,
 }: {
   label: string;
-  role: string;
-  summary: string;
-  currentValue: string;
-  baselineValue?: string;
-  changePercent: number;
-  referenceId: string;
+  title: string;
+  children: ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="text-[14px] font-medium text-[var(--foreground)]">{label}</div>
-            <Badge variant="neutral">{role}</Badge>
-          </div>
-          <p className="mt-2 text-[13px] leading-6 text-[var(--body)]">{summary}</p>
-        </div>
-        <div className="min-w-[144px] text-right">
-          <div className="font-mono text-[14px] font-medium text-[var(--foreground)]">{currentValue}</div>
-          <div className="mt-1 font-mono text-[12px] text-[var(--muted-foreground)]">
-            {baselineValue ? `baseline ${baselineValue}` : `${changePercent >= 0 ? '+' : ''}${changePercent.toFixed(0)}%`}
-          </div>
-        </div>
+    <section className="space-y-4 py-6 first:pt-0">
+      <div className="space-y-1">
+        <div className="kicker">{label}</div>
+        <h3 className="font-heading text-[18px] font-semibold text-foreground">{title}</h3>
       </div>
-      {referenceId ? <div className="mt-3 font-mono text-[12px] text-[var(--muted-foreground)]">{referenceId}</div> : null}
-    </div>
+      {children}
+    </section>
   );
 }
 
-function describeWhatHappened(detail: IssueDetailResponse) {
-  const finding = detail.finding;
-  if (detail.historical_context) {
-    const { previous_value, current_value, change_percent } = detail.historical_context;
-    return `${finding.problem_summary || finding.title} shifted from ${previous_value.toLocaleString()} to ${current_value.toLocaleString()} over the recent observation window. This is a ${changePercentLabel(change_percent)} from the previous baseline and suggests database behavior changed materially rather than normal variance.`;
+export function FindingDetail({
+  detail,
+  loading,
+}: {
+  detail: FindingDetailResponse | null;
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="technical-sheet flex h-full min-h-[540px] items-center justify-center p-8 text-sm text-muted-foreground">
+        Loading diagnosis report...
+      </div>
+    );
   }
 
-  return finding.evidence_summary || 'Postgresome detected a meaningful shift in PostgreSQL behavior and raised this diagnosis because the signal moved beyond its normal range.';
-}
-
-function buildEvidenceRows(detail: IssueDetailResponse) {
-  const finding = detail.finding;
-  const rows = [
-    { label: 'Current signal', value: finding.current_value.toLocaleString() },
-    { label: 'Threshold', value: finding.threshold_value.toLocaleString() },
-    { label: 'Occurrences', value: finding.occurrence_count.toLocaleString() },
-  ];
-
-  if (detail.historical_context) {
-    rows.push({ label: detail.historical_context.baseline_label || 'Baseline', value: detail.historical_context.baseline_value.toLocaleString() });
+  if (!detail) {
+    return (
+      <div className="technical-sheet flex h-full min-h-[540px] items-center justify-center p-8 text-sm text-muted-foreground">
+        Select a finding to review the diagnosis report.
+      </div>
+    );
   }
 
-  return rows;
-}
+  const { finding, evidence, historical_context: history, related_query, related_table } =
+    detail;
 
-function buildTimeline(detail: IssueDetailResponse) {
-  const finding = detail.finding;
-  const items = [
-    { time: formatRelativeTime(finding.first_seen_at), label: 'Issue started appearing', note: finding.problem_summary || finding.title },
-    { time: formatRelativeTime(finding.detected_at), label: 'Threshold exceeded', note: finding.evidence_summary || 'The signal crossed the detection threshold.' },
-    { time: formatRelativeTime(finding.last_seen_at), label: 'Latest evidence recorded', note: finding.verification_summary || 'Postgresome most recently observed this diagnosis in the latest collection cycle.' },
-  ];
+  return (
+    <div className="technical-sheet min-h-[540px] p-6">
+      <div className="grid gap-6 border-b border-border/80 pb-6 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Badge variant={finding.severity.toLowerCase() as "critical" | "warning" | "info"}>
+              {severityLabel(finding.severity)}
+            </Badge>
+            <div className="meta">Finding {finding.id}</div>
+            <div className="meta">{formatRelativeTime(finding.detected_at)}</div>
+          </div>
 
-  for (const item of detail.evidence ?? []) {
-    items.push({
-      time: formatRelativeTime(item.observed_at),
-      label: item.label,
-      note: item.summary,
-    });
-  }
+          <div>
+            <h2 className="max-w-3xl font-heading text-[30px] font-semibold tracking-[-0.02em] text-foreground">
+              {finding.title}
+            </h2>
+            <p className="mt-3 max-w-3xl text-[15px] leading-7 text-slate-600">
+              {finding.message}
+            </p>
+          </div>
+        </div>
 
-  if (finding.verified_fixed_at) {
-    items.push({ time: formatRelativeTime(finding.verified_fixed_at), label: 'Fix verified', note: 'The evidence trended back toward baseline after a corrective change.' });
-  }
+        <div className="grid gap-4 border-l border-border/80 pl-0 xl:pl-6">
+          <div className="kicker">At a glance</div>
+          <dl className="grid gap-3">
+            <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-b border-border/70 pb-3">
+              <dt className="text-sm text-slate-500">Object</dt>
+              <dd className="data-mono text-[12px] text-slate-700">{finding.resource_name}</dd>
+            </div>
+            <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-b border-border/70 pb-3">
+              <dt className="text-sm text-slate-500">Confidence</dt>
+              <dd className="metric-value">{finding.confidence_label}</dd>
+            </div>
+            <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-b border-border/70 pb-3">
+              <dt className="text-sm text-slate-500">Detected</dt>
+              <dd className="metric-value">{formatTimestamp(finding.detected_at)}</dd>
+            </div>
+            <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3">
+              <dt className="text-sm text-slate-500">Status</dt>
+              <dd className="metric-value">{finding.status}</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
 
-  return items;
-}
+      <DetailSection label="Problem" title="What is going wrong">
+        <div className="max-w-4xl text-[15px] leading-7 text-slate-700">
+          {finding.problem_summary}
+        </div>
+      </DetailSection>
 
-function buildLikelyCause(detail: IssueDetailResponse) {
-  const category = detail.finding.category.toLowerCase();
+      <div className="section-rule" />
 
-  if (category.includes('query')) {
-    return 'Execution time likely changed because the workload shape shifted, the plan regressed, or the query started reading more blocks than usual.';
-  }
+      <DetailSection label="Evidence" title="Why Postgresome believes this">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(260px,0.9fr)]">
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-[#f8f9ff] p-4">
+              <p className="text-[15px] leading-7 text-slate-700">
+                {finding.evidence_summary}
+              </p>
 
-  if (category.includes('vacuum') || category.includes('bloat')) {
-    return 'Maintenance may be falling behind, allowing dead tuples or stale statistics to accumulate faster than normal.';
-  }
+              {history ? (
+                <div className="mt-4 grid gap-0 rounded-md border bg-white sm:grid-cols-3">
+                  <div className="p-4 sm:border-r">
+                    <div className="kicker">Current</div>
+                    <div className="mt-2 font-heading text-[24px] font-semibold text-foreground">
+                      {formatNumber(history.current_value)}
+                    </div>
+                  </div>
+                  <div className="p-4 sm:border-r">
+                    <div className="kicker">Baseline</div>
+                    <div className="mt-2 font-heading text-[24px] font-semibold text-foreground">
+                      {formatNumber(history.baseline_value)}
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <div className="kicker">Change</div>
+                    <div className="mt-2 font-heading text-[24px] font-semibold text-foreground">
+                      {formatPercent(history.change_percent)}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
 
-  if (category.includes('lock')) {
-    return 'A blocking transaction or a write hotspot is probably holding resources long enough to affect other work.';
-  }
+            {evidence && evidence.length > 0 ? (
+              <div className="overflow-hidden rounded-lg border">
+                <div className="border-b bg-[#f8f9ff] px-4 py-3">
+                  <div className="kicker">Supporting signals</div>
+                </div>
+                <div className="divide-y">
+                  {evidence.map((item) => (
+                    <div key={item.id} className="grid gap-3 px-4 py-3 sm:grid-cols-[1.2fr_1fr_140px]">
+                      <div>
+                        <div className="text-sm font-medium text-foreground">
+                          {item.label}
+                        </div>
+                        <div className="mt-1 text-sm leading-6 text-slate-600">
+                          {item.summary}
+                        </div>
+                      </div>
+                      <div className="meta">
+                        {item.metric_key || item.reference_id || item.evidence_type}
+                      </div>
+                      <div className="meta text-left sm:text-right">
+                        {formatTimestamp(item.observed_at)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
-  return 'Related application errors, workload changes, or resource pressure are likely contributing to the database behavior change.';
-}
+            {related_query ? (
+              <div className="rounded-lg border bg-[#f8f9ff] p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="kicker">Related query</div>
+                  <Link
+                    to={`/queries?focus=${encodeURIComponent(related_query.query_id)}`}
+                    className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900"
+                  >
+                    Open in Query Explorer
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+                <pre className="overflow-x-auto rounded-md border bg-[#eff4ff] p-4 font-mono text-[12px] leading-6 text-[#0b1c30]">
+                  {related_query.query}
+                </pre>
+              </div>
+            ) : null}
+          </div>
 
-function friendlyScope(resourceType: string, resourceName: string) {
-  if (!resourceType) return 'Production database';
-  if (resourceType === 'query') return 'Query workload';
-  if (resourceType === 'table') return resourceName;
-  if (resourceType === 'index') return resourceName;
-  return 'Production database';
-}
+          <div className="space-y-4 xl:w-[400px]">
+            <div className="rounded-lg border p-4">
+              <div className="kicker">Impact</div>
+              <div className="mt-3 flex items-start gap-3">
+                <ShieldAlert className="mt-0.5 h-4 w-4 text-slate-500" />
+                <div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {finding.primary_impact.label}
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                    {finding.primary_impact.summary}
+                  </p>
+                </div>
+              </div>
+              {(finding.secondary_impacts || []).map((impact) => (
+                <div key={impact.code} className="mt-4 border-t border-dashed pt-4">
+                  <div className="text-sm font-medium text-foreground">{impact.label}</div>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{impact.summary}</p>
+                </div>
+              ))}
+            </div>
 
-function changePercentLabel(value: number) {
-  return `${value >= 0 ? '+' : ''}${value.toFixed(0)}% change`;
-}
+            {related_table ? (
+              <div className="rounded-lg border p-4">
+                <div className="kicker">Affected table</div>
+                <div className="mt-3 flex items-start gap-3">
+                  <Database className="mt-0.5 h-4 w-4 text-slate-500" />
+                  <div className="space-y-2">
+                    <div className="text-sm font-semibold text-foreground">
+                      {related_table.schema_name}.{related_table.table_name}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="meta">Dead rows</div>
+                        <div className="mt-1 text-sm font-medium text-foreground">
+                          {formatNumber(related_table.dead_rows)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="meta">Sequential scans</div>
+                        <div className="mt-1 text-sm font-medium text-foreground">
+                          {formatNumber(related_table.sequential_scans)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
-function formatEvidenceValue(value: number) {
-  if (Number.isInteger(value)) return value.toLocaleString();
-  return value.toLocaleString(undefined, { maximumFractionDigits: 1 });
+            {related_query ? (
+              <div className="rounded-lg border p-4">
+                <div className="kicker">Query load</div>
+                <div className="mt-3 flex items-start gap-3">
+                  <Gauge className="mt-0.5 h-4 w-4 text-slate-500" />
+                  <div className="grid flex-1 grid-cols-2 gap-3">
+                    <div>
+                      <div className="meta">Mean latency</div>
+                      <div className="mt-1 text-sm font-medium text-foreground">
+                        {formatDurationMs(related_query.mean_exec_time_ms)}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="meta">Calls</div>
+                      <div className="mt-1 text-sm font-medium text-foreground">
+                        {formatNumber(related_query.calls)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </DetailSection>
+
+      <div className="section-rule" />
+
+      <DetailSection label="Recommended next step" title={finding.primary_action.label}>
+        <div className="rounded-lg border bg-[#f8f9ff] p-5">
+          <p className="max-w-3xl text-[15px] leading-7 text-slate-700">
+            {finding.primary_action.summary}
+          </p>
+
+          {(finding.secondary_actions || []).length > 0 ? (
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              {finding.secondary_actions?.map((action) => (
+                <div key={action.code} className="rounded-md border bg-white p-4">
+                  <div className="text-sm font-semibold text-foreground">{action.label}</div>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{action.summary}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            {related_query ? (
+              <Button asChild>
+                <Link to={`/queries?focus=${encodeURIComponent(related_query.query_id)}`}>
+                  <FileSearch className="h-4 w-4" />
+                  Investigate related query
+                </Link>
+              </Button>
+            ) : null}
+            <Button variant="outline">Mark for review</Button>
+          </div>
+        </div>
+      </DetailSection>
+
+      <div className="section-rule" />
+
+      <DetailSection label="Verification" title="How to confirm the fix">
+        <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-start">
+          <div>
+            <p className="text-[15px] leading-7 text-slate-700">
+              {finding.verification_summary || finding.verification_hint}
+            </p>
+            <div className="mt-3 meta">
+              Last seen {formatTimestamp(finding.last_seen_at)}
+            </div>
+          </div>
+          <Badge variant="default">{finding.verification_status || "pending"}</Badge>
+        </div>
+      </DetailSection>
+    </div>
+  );
 }

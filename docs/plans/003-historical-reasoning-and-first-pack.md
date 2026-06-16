@@ -7,7 +7,7 @@
 > in `docs/plans/README.md` — unless a reviewer dispatched you and told you they
 > maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat bf5cb8f..HEAD -- cloud/internal/storage/repository cloud/internal/analysis/rules cloud/internal/api shared/metrics migrations`
+> **Drift check (run first)**: `git diff --stat bf5cb8f..HEAD -- backend/internal/storage/repository backend/internal/analysis/rules backend/internal/api backend/internal/metrics migrations`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -32,7 +32,7 @@ them to make the first three diagnosis categories feel meaningfully better.
 ## Current state
 
 - `metric_points`, `table_stats`, and `query_stats` already store evidence.
-- `cloud/internal/api/metrics_query.go` exposes time-series retrieval, but only as
+- `backend/internal/api/metrics_query.go` exposes time-series retrieval, but only as
   a generic chart-oriented query surface.
 - existing findings only record `current_value` and `threshold_value`; there is
   no baseline or change summary yet.
@@ -41,13 +41,13 @@ them to make the first three diagnosis categories feel meaningfully better.
 
 Current evidence excerpt:
 
-- `migrations/000003_table_query_stats.sql:1-44`
+- `backend/migrations/000003_table_query_stats.sql:1-44`
   ```sql
   CREATE TABLE IF NOT EXISTS table_stats ( ... );
   CREATE TABLE IF NOT EXISTS query_stats ( ... );
   ```
 
-- `cloud/internal/api/metrics_query.go:37-41`
+- `backend/internal/api/metrics_query.go:37-41`
   ```go
   // handleQueryMetrics serves GET /api/metrics/query, returning historical
   // metric evidence aggregated into buckets via TimescaleDB's time_bucket.
@@ -73,7 +73,7 @@ Existing detector coverage:
 
 | Purpose | Command | Expected on success |
 |---------|---------|---------------------|
-| Backend tests | `go test ./...` | exit 0 |
+| Backend tests | `cd backend && go test ./...` | exit 0 |
 | Frontend build | `cd frontend && npm run build` | exit 0 |
 | Frontend lint | `cd frontend && npm run lint` | exit 0 |
 
@@ -81,11 +81,11 @@ Existing detector coverage:
 
 **In scope**:
 
-- `cloud/internal/storage/repository/*` helpers for historical comparisons
-- `cloud/internal/api/*` only where needed to expose historical evidence
-- `cloud/internal/analysis/rules/*` for the first premium diagnosis pack
-- `shared/metrics/*` only where shared historical abstractions are needed
-- new migrations/indexes if required for query performance
+- `backend/internal/storage/repository/*` helpers for historical comparisons
+- `backend/internal/api/*` only where needed to expose historical evidence
+- `backend/internal/analysis/rules/*` for the first premium diagnosis pack
+- `backend/internal/metrics/*` only where historical metric abstractions are needed
+- new migration indexes if required for query performance
 
 **Out of scope**:
 
@@ -120,7 +120,7 @@ Implement these for the evidence tables already present:
 Keep the API internal to the backend diagnosis service; do not expose these
 raw helpers directly as public endpoints yet.
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 2: Add correlation helpers for the first diagnosis pack
 
@@ -133,7 +133,7 @@ For the first premium pack, add repository-level functions that can correlate:
 Do not build a generic correlation engine yet. Build narrowly useful helpers
 that produce trustworthy evidence for the chosen categories.
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 3: Upgrade three diagnosis categories end to end
 
@@ -161,7 +161,7 @@ Example expected outcome for table bloat:
 - but `table bloat risk detected`
 - with evidence derived from dead row growth, last vacuum gap, and scan trend
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 4: Expose supporting historical evidence for issue detail
 
@@ -179,7 +179,7 @@ evidence section, such as:
 Keep this focused. The endpoint should return only the evidence needed to
 support the diagnosis, not every metric series for the resource.
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ## Test plan
 
@@ -191,14 +191,14 @@ support the diagnosis, not every metric series for the resource.
   - confidence behaves predictably for weak vs strong evidence
 - Add issue detail handler tests ensuring historical evidence is bounded and
   category-relevant
-- Verification: `go test ./...` → all pass
+- Verification: `cd backend && go test ./...` → all pass
 
 ## Done criteria
 
 - [ ] Historical comparison helpers exist for current vs previous vs baseline
 - [ ] Three categories emit diagnosis-grade evidence and impact fields
 - [ ] Issue detail responses include supporting historical context
-- [ ] `go test ./...` exits 0
+- [ ] `cd backend && go test ./...` exits 0
 - [ ] `cd frontend && npm run build` exits 0
 - [ ] No files outside the in-scope list are modified (`git status`)
 - [ ] `docs/plans/README.md` status row updated

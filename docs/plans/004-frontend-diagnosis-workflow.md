@@ -77,7 +77,7 @@ Design constraints from the product docs:
 |---------|---------|---------------------|
 | Frontend build | `cd frontend && npm run build` | exit 0 |
 | Frontend lint | `cd frontend && npm run lint` | exit 0 |
-| Backend tests | `go test ./...` | exit 0 |
+| Backend tests | `cd backend && go test ./...` | exit 0 |
 
 ## Scope
 
@@ -181,7 +181,7 @@ Examples:
 - [ ] Queries and Tables clearly support diagnosis workflows
 - [ ] `cd frontend && npm run build` exits 0
 - [ ] `cd frontend && npm run lint` exits 0
-- [ ] `go test ./...` exits 0
+- [ ] `cd backend && go test ./...` exits 0
 - [ ] No files outside the in-scope list are modified (`git status`)
 - [ ] `docs/plans/README.md` status row updated
 

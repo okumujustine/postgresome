@@ -1,5 +1,6 @@
 .gocache/
 bin/
+backend/bin/
 
 .DS_Store
 *.log

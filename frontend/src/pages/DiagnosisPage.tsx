@@ -1,127 +1,186 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowUpRight } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { getFinding, listFindings } from '../api/findings';
-import { ApiError } from '../api/client';
-import { AppShell } from '../components/app-shell';
-import { FindingDetail } from '../components/finding-detail';
-import { SeverityBadge, VerificationBadge } from '../components/status-badges';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { useDatabaseInstance } from '../lib/databaseInstance';
-import type { IssueDetailResponse, IssueQueueItem } from '../types/issues';
+import { useEffect, useState } from "react";
+import { ListFilter } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { FindingDetail } from "@/components/finding-detail";
+import { FindingList } from "@/components/finding-list";
+import { Button } from "@/components/ui/button";
+import { Sheet } from "@/components/ui/sheet";
+import { getFinding, listFindings } from "@/lib/api";
+import { useWorkspace } from "@/lib/workspace-context";
+import type { FindingDetailResponse, FindingListResponse } from "@/types/api";
 
 export function DiagnosisPage() {
-  const navigate = useNavigate();
-  const params = useParams<{ id?: string }>();
-  const { selectedId, loading: instanceLoading } = useDatabaseInstance();
-  const [findings, setFindings] = useState<IssueQueueItem[]>([]);
-  const [selectedFinding, setSelectedFinding] = useState<IssueDetailResponse | null>(null);
-  const [query, setQuery] = useState('');
-  const [status, setStatus] = useState('open');
+  const { selectedInstanceId, selectedSource, loading: workspaceLoading } = useWorkspace();
+  const [listData, setListData] = useState<FindingListResponse | null>(null);
+  const [detail, setDetail] = useState<FindingDetailResponse | null>(null);
+  const [loadingList, setLoadingList] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [mobileQueueOpen, setMobileQueueOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const selectedFindingId = searchParams.get("finding");
 
   useEffect(() => {
-    if (instanceLoading || !selectedId) return;
+    if (!selectedInstanceId) {
+      setListData(null);
+      return;
+    }
 
-    listFindings({ databaseInstanceId: selectedId, status, range: '7d', limit: 50 })
-      .then((result) => {
-        setFindings(result.findings);
-        setError(null);
+    setLoadingList(true);
+    setError(null);
+
+    void listFindings({
+      databaseInstanceId: selectedInstanceId,
+      status: "open",
+      limit: 40,
+    })
+      .then((response) => {
+        setListData(response);
       })
-      .catch((err) => {
-        const message =
-          err instanceof ApiError
-            ? `The Postgresome API returned an error (${err.status}).`
-            : 'Unable to reach the Postgresome API. Is it running?';
-        setError(message);
+      .catch((caught) => {
+        setError(caught instanceof Error ? caught.message : "Failed to load findings");
+      })
+      .finally(() => {
+        setLoadingList(false);
       });
-  }, [selectedId, instanceLoading, status]);
+  }, [selectedInstanceId]);
 
   useEffect(() => {
-    if (!selectedId) return;
-    const nextId = params.id ?? findings[0]?.id;
-    if (!nextId) return;
+    if (!listData?.findings.length) {
+      setDetail(null);
+      return;
+    }
 
-    getFinding(nextId, selectedId)
-      .then(setSelectedFinding)
-      .catch(() => setSelectedFinding(null));
-  }, [selectedId, findings, params.id]);
+    const findingExists = selectedFindingId
+      ? listData.findings.some((item) => item.id === selectedFindingId)
+      : false;
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return findings;
-    return findings.filter((finding) =>
-      `${finding.problem_summary} ${finding.resource_name} ${finding.category}`.toLowerCase().includes(needle),
+    if (!findingExists) {
+      setSearchParams(
+        { finding: listData.findings[0].id },
+        { replace: true },
+      );
+    }
+  }, [listData, selectedFindingId, setSearchParams]);
+
+  useEffect(() => {
+    if (!selectedInstanceId || !selectedFindingId) {
+      setDetail(null);
+      return;
+    }
+
+    setLoadingDetail(true);
+
+    void getFinding(selectedFindingId, selectedInstanceId)
+      .then((response) => {
+        setDetail(response);
+      })
+      .catch((caught) => {
+        setError(caught instanceof Error ? caught.message : "Failed to load finding detail");
+      })
+      .finally(() => {
+        setLoadingDetail(false);
+      });
+  }, [selectedFindingId, selectedInstanceId]);
+
+  const filteredFindings =
+    listData?.findings.filter((finding) => {
+      const needle = search.trim().toLowerCase();
+      if (!needle) {
+        return true;
+      }
+
+      return [finding.title, finding.resource_name, finding.rule_key]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle);
+    }) ?? [];
+
+  if (!workspaceLoading && !selectedSource) {
+    return (
+      <div className="technical-sheet p-8">
+        <div className="kicker">Start here</div>
+        <h2 className="mt-3 font-heading text-[30px] font-semibold tracking-[-0.02em] text-foreground">
+          Connect a database before opening the diagnosis workspace.
+        </h2>
+        <p className="mt-3 max-w-2xl text-[15px] leading-7 text-slate-600">
+          Setup creates the source record, validates the connection, and lets you run
+          the first checkup. Once a source exists, Diagnosis becomes the default home.
+        </p>
+      </div>
     );
-  }, [findings, query]);
+  }
 
   return (
-    <AppShell title="Findings" subtitle="The main product experience. Review one database problem at a time and move directly to the next action.">
-      <div className="space-y-6">
-        {error ? <div className="rounded-xl border border-[var(--danger)] bg-[var(--danger-soft)] px-4 py-3 text-[13px] text-[var(--danger)]">{error}</div> : null}
-
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 className="text-[16px] font-semibold text-[var(--foreground)]">Issue summary</h2>
-            <p className="mt-1 max-w-2xl text-[14px] leading-6 text-[var(--muted-foreground)]">
-              Start from the problem, read the explanation, validate the evidence, then act. The queue keeps the highest-signal diagnoses at the top.
-            </p>
+    <div className="mx-auto max-w-[1600px] space-y-4">
+      <div className="technical-sheet flex flex-wrap items-center justify-between gap-4 px-6 py-5">
+        <div>
+          <div className="kicker">Selected database</div>
+          <div className="mt-2 font-heading text-[18px] font-semibold text-foreground">
+            {selectedSource?.database.name}
           </div>
-          <div className="flex items-center gap-2 rounded-[10px] border border-[var(--border)] bg-[var(--muted)] p-1">
-            <Button variant={status === 'open' ? 'outline' : 'ghost'} size="sm" onClick={() => setStatus('open')}>
-              Open
-            </Button>
-            <Button variant={status === 'resolved' ? 'outline' : 'ghost'} size="sm" onClick={() => setStatus('resolved')}>
-              Resolved
-            </Button>
-          </div>
+          <div className="meta mt-1">{selectedSource?.database.host}</div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)]">
-            <div className="border-b border-[var(--border)] px-4 py-4">
-              <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search diagnosis queue" />
+        <div className="flex items-center gap-2 lg:hidden">
+          <Sheet
+            open={mobileQueueOpen}
+            onOpenChange={setMobileQueueOpen}
+            title="Diagnosis queue"
+            trigger={
+              <Button variant="outline">
+                <ListFilter className="h-4 w-4" />
+                Open queue
+              </Button>
+            }
+          >
+            <div className="h-[calc(100vh-100px)]">
+              <FindingList
+                findings={filteredFindings}
+                selectedFindingId={selectedFindingId}
+                onSelect={(findingId) => {
+                  setSearchParams({ finding: findingId });
+                  setMobileQueueOpen(false);
+                }}
+                search={search}
+                onSearchChange={setSearch}
+                counts={listData?.severity_counts}
+                total={listData?.total}
+              />
             </div>
-            <div className="max-h-[72vh] overflow-y-auto p-2">
-              {filtered.map((finding) => {
-                const active = selectedFinding?.finding.id === finding.id;
-                return (
-                  <button
-                    key={finding.id}
-                    onClick={() => navigate(`/findings/${finding.id}`)}
-                    className={`mb-2 w-full rounded-xl border p-4 text-left transition-colors ${
-                      active ? 'border-[var(--foreground)] bg-[var(--muted)]' : 'border-transparent bg-[var(--panel)] hover:border-[var(--border)] hover:bg-[var(--muted)]'
-                    }`}
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <SeverityBadge severity={finding.severity} />
-                      <VerificationBadge status={finding.verification_status} />
-                    </div>
-                    <div className="mt-3 text-[14px] font-semibold leading-6 text-[var(--foreground)]">{finding.problem_summary || finding.title}</div>
-                    <div className="mt-1 text-[13px] leading-6 text-[var(--muted-foreground)]">{finding.impact_summary || finding.evidence_summary}</div>
-                    <div className="mt-3 inline-flex items-center gap-2 text-[12px] text-[var(--muted-foreground)]">
-                      {finding.resource_type} · {finding.resource_name}
-                      <ArrowUpRight size={12} />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div>
-            {selectedFinding ? (
-              <FindingDetail detail={selectedFinding} />
-            ) : (
-              <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--muted)] px-6 py-10 text-center">
-                <AlertTriangle className="mx-auto mb-3 text-[var(--muted-foreground)]" size={20} />
-                <div className="text-[14px] text-[var(--muted-foreground)]">Choose a finding from the queue to inspect the evidence and recommended next step.</div>
-              </div>
-            )}
-          </div>
+          </Sheet>
         </div>
       </div>
-    </AppShell>
+
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="grid min-h-[720px] gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="technical-sheet hidden overflow-hidden lg:block">
+          {loadingList ? (
+            <div className="flex h-full items-center justify-center p-8 text-sm text-muted-foreground">
+              Loading findings...
+            </div>
+          ) : (
+            <FindingList
+              findings={filteredFindings}
+              selectedFindingId={selectedFindingId}
+              onSelect={(findingId) => setSearchParams({ finding: findingId })}
+              search={search}
+              onSearchChange={setSearch}
+              counts={listData?.severity_counts}
+              total={listData?.total}
+            />
+          )}
+        </div>
+
+        <FindingDetail detail={detail} loading={loadingDetail} />
+      </div>
+    </div>
   );
 }

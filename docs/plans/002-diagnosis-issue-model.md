@@ -7,7 +7,7 @@
 > in `docs/plans/README.md` — unless a reviewer dispatched you and told you they
 > maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat bf5cb8f..HEAD -- cloud/internal/analysis/finding.go cloud/internal/storage/repository/findings.go cloud/internal/api/findings.go cloud/internal/api/dashboard_overview.go frontend/src/types/dashboard.ts migrations`
+> **Drift check (run first)**: `git diff --stat bf5cb8f..HEAD -- backend/internal/analysis/finding.go backend/internal/storage/repository/findings.go backend/internal/api/findings.go backend/internal/api/dashboard_overview.go frontend/src/types/dashboard.ts migrations`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -31,11 +31,11 @@ issues that the backend and frontend can both depend on.
 
 ## Current state
 
-- `cloud/internal/analysis/finding.go` — current finding fields stop at title,
+- `backend/internal/analysis/finding.go` — current finding fields stop at title,
   message, recommendation, rule identity, and current/threshold values.
-- `cloud/internal/storage/repository/findings.go` — persistence only upserts the
+- `backend/internal/storage/repository/findings.go` — persistence only upserts the
   current compact finding shape.
-- `cloud/internal/api/dashboard_overview.go` and `cloud/internal/api/findings.go` — API DTOs
+- `backend/internal/api/dashboard_overview.go` and `backend/internal/api/findings.go` — API DTOs
   mirror the same compact shape.
 - `frontend/src/types/dashboard.ts` — frontend types still use
   `DashboardFinding` with only title/message/recommendation plus lifecycle and
@@ -43,7 +43,7 @@ issues that the backend and frontend can both depend on.
 
 Current shape excerpt:
 
-- `cloud/internal/analysis/finding.go:8-31`
+- `backend/internal/analysis/finding.go:8-31`
   ```go
   type Finding struct {
       ID string
@@ -94,7 +94,7 @@ Use that language in field names, comments, and DTOs when it improves clarity.
 
 | Purpose | Command | Expected on success |
 |---------|---------|---------------------|
-| Backend tests | `go test ./...` | exit 0 |
+| Backend tests | `cd backend && go test ./...` | exit 0 |
 | Frontend build | `cd frontend && npm run build` | exit 0 |
 | Frontend lint | `cd frontend && npm run lint` | exit 0 |
 
@@ -102,11 +102,11 @@ Use that language in field names, comments, and DTOs when it improves clarity.
 
 **In scope**:
 
-- `cloud/internal/analysis/finding.go`
-- `cloud/internal/storage/repository/findings.go`
-- `cloud/internal/api/findings.go`
-- `cloud/internal/api/dashboard_overview.go`
-- new issue detail API file(s) under `cloud/internal/api`
+- `backend/internal/analysis/finding.go`
+- `backend/internal/storage/repository/findings.go`
+- `backend/internal/api/findings.go`
+- `backend/internal/api/dashboard_overview.go`
+- new issue detail API file(s) under `backend/internal/api`
 - `frontend/src/types/dashboard.ts`
 - any frontend API client files needed to consume the richer issue detail shape
 - new migrations that alter `findings`
@@ -150,7 +150,7 @@ Recommended compatibility strategy:
   - `Message` → problem statement
   - `Recommendation` → suggested action
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 2: Add schema support for diagnosis-grade findings
 
@@ -171,11 +171,11 @@ columns to `findings`, such as:
 Use additive schema changes only. Do not remove the existing columns in this
 plan. Backfill old rows conservatively where possible.
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 3: Update repository read/write paths
 
-Update `cloud/internal/storage/repository/findings.go` so:
+Update `backend/internal/storage/repository/findings.go` so:
 
 - upserts write the new columns
 - list queries return enough fields for queue-level diagnosis summaries
@@ -188,7 +188,7 @@ Preferred repository split:
 
 Do not overload one DTO for both if it creates a large partial-response type.
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 4: Add a dedicated issue detail endpoint
 
@@ -213,7 +213,7 @@ Return a payload that includes:
 Keep `GET /api/findings` optimized for queue views. Do not turn the list
 endpoint into a heavy detail payload.
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 5: Update frontend types and clients for the richer issue model
 
@@ -237,14 +237,14 @@ while preserving compatibility at call sites in a controlled way.
 - Add API handler tests for the new detail endpoint
 - Add frontend type-level/build coverage by ensuring the issue detail client
   compiles against the new DTO
-- Verification: `go test ./...` and `cd frontend && npm run build` → all pass
+- Verification: `cd backend && go test ./...` and `cd frontend && npm run build` → all pass
 
 ## Done criteria
 
 - [ ] The findings schema stores diagnosis-grade issue fields
 - [ ] The backend exposes a dedicated issue detail response
 - [ ] Queue/list and detail projections are separated cleanly
-- [ ] `go test ./...` exits 0
+- [ ] `cd backend && go test ./...` exits 0
 - [ ] `cd frontend && npm run build` exits 0
 - [ ] No files outside the in-scope list are modified (`git status`)
 - [ ] `docs/plans/README.md` status row updated

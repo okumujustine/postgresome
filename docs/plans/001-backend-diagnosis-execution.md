@@ -7,7 +7,7 @@
 > in `docs/plans/README.md` — unless a reviewer dispatched you and told you they
 > maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat bf5cb8f..HEAD -- agent/internal/runner.go agent/internal/client/client.go cloud/internal/api/handlers.go cloud/internal/api/server.go cloud/internal/analysis/engine.go cloud/internal/storage/repository agent/internal/collector migrations`
+> **Drift check (run first)**: `git diff --stat bf5cb8f..HEAD -- agent/internal/runner.go agent/internal/client/client.go backend/internal/api/handlers.go backend/internal/api/server.go backend/internal/analysis/engine.go backend/internal/storage/repository agent/internal/collector migrations`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -36,11 +36,11 @@ later premium feature depends on.
   sends completed findings to the API.
 - `agent/internal/client/client.go` — still exposes `SendFindings(...)` to
   `POST /api/findings/ingest`.
-- `cloud/internal/api/handlers.go` — the API only persists findings; it does not
+- `backend/internal/api/handlers.go` — the API only persists findings; it does not
   generate them.
-- `cloud/internal/analysis/engine.go` — rule engine exists already and can be reused
+- `backend/internal/analysis/engine.go` — rule engine exists already and can be reused
   in the backend.
-- `migrations/000003_table_query_stats.sql` — the backend stores table and
+- `backend/migrations/000003_table_query_stats.sql` — the backend stores table and
   query evidence, but no pg_stat_activity snapshot or EXPLAIN evidence.
 
 Current execution excerpt:
@@ -63,7 +63,7 @@ Current execution excerpt:
   _, err = apiClient.SendFindings(sendFindingsCtx, r.cfg.AgentID, r.cfg.DatabaseInstanceID, findings)
   ```
 
-- `cloud/internal/api/handlers.go:176-204`
+- `backend/internal/api/handlers.go:176-204`
   ```go
   if len(req.Findings) > 0 {
       findings := make([]analysis.Finding, len(req.Findings))
@@ -75,7 +75,7 @@ Current execution excerpt:
   }
   ```
 
-- `migrations/000003_table_query_stats.sql:1-44`
+- `backend/migrations/000003_table_query_stats.sql:1-44`
   ```sql
   CREATE TABLE IF NOT EXISTS table_stats ( ... );
   CREATE TABLE IF NOT EXISTS query_stats ( ... );
@@ -90,13 +90,13 @@ Repo conventions and constraints:
   backend should own diagnosis logic. Match the vocabulary in
   `docs/architecture/diagnosis-platform.md`.
 - Current backend handler style is simple net/http plus repository helpers; see
-  `cloud/internal/api/findings.go` and `cloud/internal/api/dashboard_overview.go`.
+  `backend/internal/api/findings.go` and `backend/internal/api/dashboard_overview.go`.
 
 ## Commands you will need
 
 | Purpose | Command | Expected on success |
 |---------|---------|---------------------|
-| Backend tests | `go test ./...` | exit 0 |
+| Backend tests | `cd backend && go test ./...` | exit 0 |
 | Frontend build | `cd frontend && npm run build` | exit 0 |
 | Frontend lint | `cd frontend && npm run lint` | exit 0 |
 
@@ -106,13 +106,13 @@ Repo conventions and constraints:
 
 - `agent/internal/runner.go`
 - `agent/internal/client/client.go`
-- `cloud/internal/api/handlers.go`
-- `cloud/internal/api/server.go`
-- new backend diagnosis service files under `cloud/internal/api` or `cloud/internal/diagnosis`
-- `cloud/internal/analysis/engine.go` usage sites
-- `cloud/internal/storage/repository/*` files needed for new ingest/query paths
+- `backend/internal/api/handlers.go`
+- `backend/internal/api/server.go`
+- new backend diagnosis service files under `backend/internal/api` or `backend/internal/diagnosis`
+- `backend/internal/analysis/engine.go` usage sites
+- `backend/internal/storage/repository/*` files needed for new ingest/query paths
 - new migrations for additional evidence tables
-- collector payload types in `shared/metrics/*` only where required for API transport
+- collector payload types in `backend/internal/metrics/*` only where required for API transport
 
 **Out of scope**:
 
@@ -147,7 +147,7 @@ Define the new agent contract:
 - the API is responsible for generating findings
 - `POST /api/findings/ingest` becomes deprecated or transitional
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 2: Add missing evidence ingestion for activity and EXPLAIN data
 
@@ -185,11 +185,11 @@ Recommended schema additions:
 Add agent client methods for these payloads, mirroring the existing table/query
 stats transport pattern.
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 3: Build a backend diagnosis service
 
-Add a dedicated service layer, for example `cloud/internal/diagnosis/service.go`,
+Add a dedicated service layer, for example `backend/internal/diagnosis/service.go`,
 that:
 
 - loads recent database stats and delta inputs
@@ -212,7 +212,7 @@ Important shape requirement:
 - diagnosis should not require the frontend to make multiple calls to assemble
   consistency
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 4: Remove agent-side rule execution from the happy path
 
@@ -227,7 +227,7 @@ If a transitional phase is needed, keep `SendFindings` behind an explicit
 feature flag or debug path, but the default production path must be
 backend-owned diagnosis.
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 5: Deprecate findings ingest cleanly
 
@@ -250,17 +250,17 @@ plan and document the removal in plan 002's maintenance notes.
   - mixed evidence types produce one diagnosis pass
   - stale findings still resolve when no issue is re-detected
 - Model new handler tests after the existing API handler style in
-  `cloud/internal/api/findings.go` and related tests if present
+  `backend/internal/api/findings.go` and related tests if present
 - Add a regression test ensuring the agent can run one collection cycle without
   local rule execution on the default path
-- Verification: `go test ./...` → all pass
+- Verification: `cd backend && go test ./...` → all pass
 
 ## Done criteria
 
 - [ ] The default agent runtime path does not run diagnosis rules locally
 - [ ] Backend-owned diagnosis exists and runs against stored evidence
 - [ ] Activity and EXPLAIN evidence are persisted through backend ingest paths
-- [ ] `go test ./...` exits 0
+- [ ] `cd backend && go test ./...` exits 0
 - [ ] `cd frontend && npm run build` exits 0
 - [ ] No files outside the in-scope list are modified (`git status`)
 - [ ] `docs/plans/README.md` status row updated

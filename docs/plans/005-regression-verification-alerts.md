@@ -7,7 +7,7 @@
 > in `docs/plans/README.md` — unless a reviewer dispatched you and told you they
 > maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat bf5cb8f..HEAD -- cloud/internal/storage/repository/findings.go cloud/internal/api frontend/src migrations`
+> **Drift check (run first)**: `git diff --stat bf5cb8f..HEAD -- backend/internal/storage/repository/findings.go backend/internal/api frontend/src migrations`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -30,9 +30,9 @@ alerts useful instead of noisy threshold spam.
 
 ## Current state
 
-- `migrations/000004_findings_lifecycle.sql` — current lifecycle only supports
+- `backend/migrations/000004_findings_lifecycle.sql` — current lifecycle only supports
   `open` and `resolved`.
-- `cloud/internal/storage/repository/findings.go` — stale findings resolve, and
+- `backend/internal/storage/repository/findings.go` — stale findings resolve, and
   recurring detections reopen the same row, but there is no explicit
   `regressed`, `improving`, or `verified_fixed` state.
 - frontend issue views show open/resolved but do not yet present recurrence or
@@ -40,13 +40,13 @@ alerts useful instead of noisy threshold spam.
 
 Current lifecycle excerpt:
 
-- `migrations/000004_findings_lifecycle.sql:27-34`
+- `backend/migrations/000004_findings_lifecycle.sql:27-34`
   ```sql
   ALTER TABLE findings
       ADD CONSTRAINT findings_status_check CHECK (status IN ('open', 'resolved'));
   ```
 
-- `cloud/internal/storage/repository/findings.go:18-34`
+- `backend/internal/storage/repository/findings.go:18-34`
   ```sql
   ON CONFLICT (database_instance_id, fingerprint) DO UPDATE SET
       ...
@@ -60,7 +60,7 @@ Current lifecycle excerpt:
 
 | Purpose | Command | Expected on success |
 |---------|---------|---------------------|
-| Backend tests | `go test ./...` | exit 0 |
+| Backend tests | `cd backend && go test ./...` | exit 0 |
 | Frontend build | `cd frontend && npm run build` | exit 0 |
 | Frontend lint | `cd frontend && npm run lint` | exit 0 |
 
@@ -68,9 +68,9 @@ Current lifecycle excerpt:
 
 **In scope**:
 
-- `migrations/*` affecting finding lifecycle
-- `cloud/internal/storage/repository/findings.go`
-- issue detail/list API files under `cloud/internal/api`
+- `backend/migrations/*` affecting finding lifecycle
+- `backend/internal/storage/repository/findings.go`
+- issue detail/list API files under `backend/internal/api`
 - frontend issue views/components that surface lifecycle and verification state
 - alert integration scaffolding if it already exists; otherwise add backend-only
   alert payload generation hooks without full provider integration
@@ -108,7 +108,7 @@ Recommended approach:
 
 This avoids overloading one status enum with too many meanings.
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 2: Add fix verification rules
 
@@ -125,7 +125,7 @@ For the first diagnosis pack, define verification checks that can confirm a fix:
 Store the verification result on the issue so it can be surfaced in detail
 views and alert payloads.
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ### Step 3: Surface regression and verification in the UI
 
@@ -155,7 +155,7 @@ If notification transport does not exist yet, stop at payload generation plus
 tests and documentation hooks. Do not build a half-finished notification stack
 in this plan.
 
-**Verify**: `go test ./...` → exit 0
+**Verify**: `cd backend && go test ./...` → exit 0
 
 ## Test plan
 
@@ -163,7 +163,7 @@ in this plan.
 - Add verification tests for the first diagnosis pack categories
 - Add API tests for lifecycle fields in queue and detail responses
 - Add frontend build/lint coverage to ensure lifecycle badges/details compile
-- Verification: `go test ./...`, `cd frontend && npm run build`, and `cd frontend && npm run lint` → all pass
+- Verification: `cd backend && go test ./...`, `cd frontend && npm run build`, and `cd frontend && npm run lint` → all pass
 
 ## Done criteria
 
@@ -171,7 +171,7 @@ in this plan.
 - [ ] The first diagnosis pack can mark fixes as verified when evidence improves
 - [ ] UI surfaces lifecycle and verification clearly
 - [ ] Diagnosis-first alert payload generation exists
-- [ ] `go test ./...` exits 0
+- [ ] `cd backend && go test ./...` exits 0
 - [ ] `cd frontend && npm run build` exits 0
 - [ ] `cd frontend && npm run lint` exits 0
 - [ ] No files outside the in-scope list are modified (`git status`)

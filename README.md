@@ -137,11 +137,10 @@ If a metric cannot help detect, explain, or prove a problem, we should avoid col
 
 ## Current repository direction
 
-The repository is being simplified around three main surfaces:
+The repository is being simplified around two main product surfaces:
 
-- a cloud/backend app that stores evidence and runs diagnosis
+- a backend app that stores evidence and runs diagnosis
 - a diagnosis-first frontend
-- shared PostgreSQL evidence types
 
 The next steps should continue pushing the codebase away from dashboard thinking and toward diagnosis-first product behavior.
 
@@ -152,10 +151,10 @@ For the target long-term flow, see:
 
 ## Repository layout
 
-- `cloud/` — API and migration entrypoints for the hosted/backend app
-- `cloud/internal/` — cloud/backend-owned API, diagnosis, analysis, storage, and migrations
-- `shared/` — shared evidence and metric types
+- `backend/` — Go backend app, module, and migration entrypoints
+- `backend/internal/` — backend-owned API, diagnosis, analysis, storage, and supporting packages
+- `backend/internal/metrics/` — backend-owned evidence and metric types
+- `backend/migrations/` — schema changes for the Postgresome storage database
 - `frontend/` — diagnosis UI
-- `migrations/` — schema changes for the Postgresome storage database
 - `docker/` — remaining local infrastructure assets
 - `docs/` — architecture docs, roadmap, implementation plans, and mockups

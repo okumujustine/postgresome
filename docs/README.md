@@ -19,7 +19,7 @@ artifacts out of the repo root.
 
 ## Code surfaces
 
-- `../cloud/` — backend app entrypoints
+- `../backend/` — backend app, module, and migration entrypoints
 - `../frontend/` — product UI
-- `../cloud/internal/` — backend-owned internals
-- `../shared/` — shared cross-surface code
+- `../backend/internal/` — backend-owned internals
+- `../backend/internal/metrics/` — backend-owned evidence and metric types
