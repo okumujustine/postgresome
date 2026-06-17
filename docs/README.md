@@ -15,6 +15,11 @@ artifacts out of the repo root.
 - `architecture/diagnosis-platform.md` — diagnosis-first product brief
 - `architecture/source-to-diagnosis-flow.md` — long-term source, backend, finding, and evidence architecture
 - `product/roadmap.md` — current phased roadmap
+- `product/strategy.md` — commercial and category strategy
+- `product/prd.md` — first premium release requirements
+- `product/pricing-and-packaging.md` — pricing and packaging direction
+- `product/buyer-personas-and-gtm.md` — ICP and go-to-market framing
+- `product/messaging.md` — homepage and product messaging foundation
 - `plans/README.md` — implementation plan index and status
 
 ## Code surfaces

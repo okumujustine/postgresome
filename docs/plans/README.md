@@ -13,6 +13,7 @@ honor its STOP conditions, and update your row when done.
 | 003 | Add historical reasoning and ship the first premium diagnosis pack | P1 | L | 001, 002 | DONE |
 | 004 | Build diagnosis-first frontend workflows on the richer issue APIs | P2 | L | 002, 003 | DONE |
 | 005 | Add issue regression, fix verification, and diagnosis-first alerts | P2 | L | 002, 003, 004 | DONE |
+| 006 | Productization and commercial readiness | P2 | M | 001, 002, 003, 004, 005 | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 

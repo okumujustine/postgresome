@@ -148,6 +148,11 @@ For the target long-term flow, see:
 
 - `docs/architecture/diagnosis-platform.md`
 - `docs/architecture/source-to-diagnosis-flow.md`
+- `docs/product/strategy.md`
+- `docs/product/prd.md`
+- `docs/product/pricing-and-packaging.md`
+- `docs/product/buyer-personas-and-gtm.md`
+- `docs/product/messaging.md`
 
 ## Repository layout
 

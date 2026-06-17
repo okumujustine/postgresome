@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { DismissibleAlert } from "@/components/ui/dismissible-alert";
 import { listFindings } from "@/lib/api";
 import { formatRelativeTime, formatTimestamp, severityClasses, severityLabel } from "@/lib/format";
 import { useWorkspace } from "@/lib/workspace-context";
@@ -87,29 +88,18 @@ export function HistoryPage() {
 
   return (
     <div className="mx-auto max-w-[1600px] space-y-4">
-      <div className="technical-sheet px-6 py-5">
-        <div className="kicker">Diagnosis timeline</div>
-        <div className="mt-3 font-heading text-[24px] font-semibold tracking-[-0.01em] text-foreground">
-          {selectedSource?.database.name || "No database selected"}
-        </div>
-        <p className="mt-2 max-w-2xl text-[15px] leading-7 text-slate-600">
-          Follow when a finding appeared, when it regressed, and whether the evidence
-          later improved.
-        </p>
-      </div>
-
-      {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      ) : null}
+      {error ? <DismissibleAlert>{error}</DismissibleAlert> : null}
 
       <div className="technical-sheet p-6">
+        <div className="mb-6">
+          <div className="kicker">Diagnosis timeline</div>
+          <div className="meta mt-2">{selectedSource?.database.name || "No database selected"}</div>
+        </div>
         {loading ? (
           <div className="text-sm text-muted-foreground">Loading history...</div>
         ) : (
           <div className="relative">
-            <div className="absolute left-[107px] top-1 bottom-1 hidden w-px bg-border sm:block" />
+            <div className="absolute bottom-1 left-[107px] top-1 hidden w-[2px] bg-[#111111] sm:block" />
             <div className="space-y-5">
               {events.map((event, index) => {
                 const tone = severityClasses(event.severity);
@@ -123,14 +113,14 @@ export function HistoryPage() {
                     <div className="hidden pt-1 sm:flex sm:justify-center">
                       <div className={`mt-1 h-3 w-3 rounded-full ${tone.accent}`} />
                     </div>
-                    <div className="rounded-md border bg-white p-4">
+                    <div className="rounded-md border-2 border-[#111111] bg-white p-4 shadow-[2px_2px_0_#111111]">
                       <div className="flex flex-wrap items-center gap-3">
                         <div className={`kicker ${tone.text}`}>
                           {severityLabel(event.severity)}
                         </div>
                         <div className="meta">{formatRelativeTime(event.time)}</div>
                       </div>
-                      <div className="mt-2 font-heading text-[18px] font-semibold text-foreground">
+                      <div className="mt-2 font-heading text-[18px] font-semibold tracking-[-0.02em] text-foreground">
                         {event.title}
                       </div>
                       <div className="mt-2 text-sm leading-6 text-slate-600">
@@ -142,7 +132,7 @@ export function HistoryPage() {
               })}
 
               {events.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border bg-white p-6 text-sm text-muted-foreground">
+                <div className="rounded-md border-2 border-dashed border-border bg-white p-6 text-sm text-muted-foreground">
                   No diagnosis history is available yet for this database.
                 </div>
               ) : null}

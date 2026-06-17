@@ -1,4 +1,25 @@
 .gocache/
+.cache/
+.turbo/
+.parcel-cache/
+.sass-cache/
+.eslintcache
+.stylelintcache
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.next/cache/
+frontend/.vite/
+frontend/.cache/
+frontend/.eslintcache
+frontend/.turbo/
+node_modules/.cache/
+.npm/
+.pnpm-store/
+yarn-error.log
+yarn-debug.log
 bin/
 backend/bin/
 

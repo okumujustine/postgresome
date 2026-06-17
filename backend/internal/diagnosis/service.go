@@ -102,6 +102,8 @@ func (s *Service) RunForDatabase(ctx context.Context, databaseInstanceID string)
 		return nil, err
 	}
 
+	normalizeFindings(findings)
+
 	if err := repository.UpsertFindings(ctx, s.pool, findings); err != nil {
 		return nil, err
 	}

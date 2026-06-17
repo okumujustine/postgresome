@@ -80,36 +80,41 @@ export function severityClasses(value?: string | null) {
   switch ((value || "").toLowerCase()) {
     case "critical":
       return {
-        badge: "border-red-200 bg-red-50 text-red-700",
-        accent: "bg-red-500",
-        text: "text-red-700",
+        badge: "border-[#111111] bg-[#ffd7d2] text-[#a31616]",
+        accent: "bg-[#dc2626]",
+        text: "text-[#a31616]",
       };
     case "warning":
       return {
-        badge: "border-amber-200 bg-amber-50 text-amber-700",
-        accent: "bg-amber-500",
-        text: "text-amber-700",
+        badge: "border-[#111111] bg-[#fff1b8] text-[#8a4b00]",
+        accent: "bg-[#b45309]",
+        text: "text-[#8a4b00]",
       };
     default:
       return {
-        badge: "border-blue-200 bg-blue-50 text-blue-700",
-        accent: "bg-blue-500",
-        text: "text-blue-700",
+        badge: "border-[#111111] bg-[#dce8ff] text-[#254fd2]",
+        accent: "bg-[#254fd2]",
+        text: "text-[#254fd2]",
       };
   }
 }
 
 export function statusClasses(value?: string | null) {
   switch ((value || "").toLowerCase()) {
+    case "running":
+    case "open":
+    case "active":
+    case "pending":
+    case "scheduled":
+      return "border-[#111111] bg-[#EAF2FF] text-[#2F5FD0]";
     case "critical":
     case "degraded":
-      return "border-red-200 bg-red-50 text-red-700";
+      return "border-[#111111] bg-[#ffd7d2] text-[#a31616]";
     case "warning":
-      return "border-amber-200 bg-amber-50 text-amber-700";
+      return "border-[#111111] bg-[#fff1b8] text-[#8a4b00]";
     case "healthy":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+      return "border-[#111111] bg-[#d9f7d8] text-[#166534]";
     default:
-      return "border-slate-200 bg-slate-50 text-slate-600";
+      return "border-[#111111] bg-white text-slate-700";
   }
 }
-

@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,26 +6,26 @@
 
 @layer base {
   :root {
-    --background: 220 100% 99%;
-    --foreground: 214 62% 12%;
+    --background: 48 33% 97%;
+    --foreground: 0 0% 7%;
     --card: 0 0% 100%;
-    --card-foreground: 214 62% 12%;
+    --card-foreground: 0 0% 7%;
     --popover: 0 0% 100%;
-    --popover-foreground: 214 62% 12%;
+    --popover-foreground: 0 0% 7%;
     --primary: 0 0% 0%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 213 100% 95%;
-    --secondary-foreground: 214 52% 12%;
-    --muted: 215 100% 97%;
-    --muted-foreground: 225 6% 29%;
-    --accent: 217 91% 60%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 75% 42%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 220 23% 89%;
-    --input: 220 23% 89%;
-    --ring: 217 91% 60%;
-    --radius: 8px;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 48 17% 92%;
+    --secondary-foreground: 0 0% 10%;
+    --muted: 48 20% 94%;
+    --muted-foreground: 0 0% 36%;
+    --accent: 0 0% 12%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 0% 12%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 7%;
+    --input: 0 0% 7%;
+    --ring: 0 0% 7%;
+    --radius: 10px;
   }
 
   * {
@@ -39,6 +39,10 @@
   body {
     @apply m-0 min-h-screen bg-background font-sans text-sm text-foreground antialiased;
     font-feature-settings: "cv11", "ss01";
+    background-image:
+      linear-gradient(rgba(17, 17, 17, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(17, 17, 17, 0.03) 1px, transparent 1px);
+    background-size: 28px 28px;
   }
 
   h1,
@@ -60,24 +64,71 @@
 
 @layer components {
   .app-frame {
-    @apply min-h-screen bg-background;
+    @apply min-h-screen bg-background text-foreground;
   }
 
   .panel {
     @apply rounded-lg border bg-card shadow-panel;
+    border-color: rgb(17 17 17);
+    background: rgb(255 255 255);
   }
 
   .technical-sheet {
     @apply rounded-lg border bg-card shadow-panel;
+    border-color: rgb(17 17 17);
+    background: rgb(255 255 255);
+  }
+
+  .surface-muted {
+    @apply rounded-md border bg-[#f4f1e6];
+    border-color: rgb(17 17 17);
+  }
+
+  .surface-selection {
+    @apply border border-[#111111] bg-[#fff3a6];
+    box-shadow: 1px 1px 0 rgba(17, 17, 17, 0.75);
+  }
+
+  .surface-code {
+    @apply rounded-md border bg-[#111111] text-white;
+    border-color: rgb(17 17 17);
+    box-shadow: 1px 1px 0 rgba(17, 17, 17, 0.75);
+  }
+
+  .inline-alert {
+    @apply rounded-md border px-4 py-3 text-sm text-slate-900;
+    border-color: rgb(17 17 17);
+    background: #fff3a6;
+    box-shadow: 1px 1px 0 rgba(17, 17, 17, 0.75);
+  }
+
+  .report-title {
+    @apply font-heading text-[30px] font-semibold tracking-[-0.05em] text-foreground;
+  }
+
+  .report-lead {
+    @apply max-w-3xl text-[15px] leading-8 text-slate-700;
+  }
+
+  .detail-block {
+    @apply rounded-md border bg-white;
+    border-color: rgb(17 17 17);
+    box-shadow: 1px 1px 0 rgba(17, 17, 17, 0.75);
+  }
+
+  .summary-strip {
+    @apply rounded-md border bg-[#f4f1e6];
+    border-color: rgb(17 17 17);
+    box-shadow: 1px 1px 0 rgba(17, 17, 17, 0.75);
   }
 
   .kicker {
-    @apply font-mono text-[12px] uppercase tracking-[0.06em] text-muted-foreground;
+    @apply text-[11px] font-semibold capitalize tracking-[0.02em] text-muted-foreground;
     font-variant-numeric: tabular-nums;
   }
 
   .meta {
-    @apply font-mono text-[12px] text-muted-foreground;
+    @apply text-[12px] text-muted-foreground;
     font-variant-numeric: tabular-nums;
   }
 
@@ -92,10 +143,37 @@
   }
 
   .section-rule {
-    @apply border-t border-dashed border-border/80;
+    @apply border-t border-dashed;
+    border-color: rgba(17, 17, 17, 0.85);
   }
 
   .panel-divider {
-    @apply border-l border-border/80;
+    @apply border-l;
+    border-color: rgba(17, 17, 17, 1);
+  }
+
+  .draft-note {
+    @apply rounded-md border bg-[#f7f4ea] px-4 py-3;
+    border-color: rgb(17 17 17);
+    box-shadow: 1px 1px 0 rgba(17, 17, 17, 0.75);
+  }
+
+  .mono-pill {
+    @apply inline-flex items-center rounded-md border px-3 py-1 text-[12px] font-medium;
+    border-color: rgb(17 17 17);
+    background: #f4f1e6;
+  }
+
+  .ink-title {
+    @apply font-heading text-[18px] font-semibold tracking-[-0.02em] text-foreground;
+  }
+
+  .table-header {
+    @apply rounded-t-lg border-b border-b-white/20 bg-[#111111] px-4 py-3 text-[12px] font-semibold capitalize tracking-[0.01em] text-white;
+  }
+
+  .table-row {
+    @apply border-t bg-white transition-transform transition-colors duration-150 hover:bg-[#f4f1e6];
+    border-color: rgba(17, 17, 17, 0.14);
   }
 }

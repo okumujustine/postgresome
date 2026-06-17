@@ -24,6 +24,12 @@ migrate:
 	cd backend && POSTGRESOME_DATABASE_URL="$(POSTGRESOME_DB_URL)" go run ./migrate
 
 
+.PHONY: seed
+seed:
+	@echo "Seeding development diagnosis data..."
+	cd backend && POSTGRESOME_DATABASE_URL="$(POSTGRESOME_DB_URL)" POSTGRESOME_SECRET_KEY="$(POSTGRESOME_SECRET_KEY)" POSTGRESOME_ENABLE_DEV_SEED=true go run ./seed
+
+
 .PHONY: postgres-up
 postgres-up:
 	docker compose up -d

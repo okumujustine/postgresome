@@ -215,6 +215,26 @@ Add:
 - before/after verification of fixes
 - source-aware setup experiences for managed providers
 
+## Phase 8: Commercial readiness
+
+Goal:
+
+Turn the diagnosis-first product into a clearly sellable premium offering.
+
+Add:
+
+- explicit buyer positioning
+- pricing and packaging
+- premium release definition
+- diagnosis-first homepage and product messaging
+- activation and conversion milestones
+
+Success looks like:
+
+```text
+Postgresome has a coherent commercial story that matches the product we are actually building.
+```
+
 ## Immediate execution filter
 
 Before adding any new collector, endpoint, schema field, or UI module, ask:

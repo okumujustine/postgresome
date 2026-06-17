@@ -8,25 +8,30 @@ import {
   formatNumber,
   formatPercent,
   formatRelativeTime,
+  statusClasses,
   formatTimestamp,
   severityLabel,
 } from "@/lib/format";
 import type { FindingDetailResponse } from "@/types/api";
 
 function DetailSection({
+  id,
   label,
   title,
   children,
 }: {
+  id?: string;
   label: string;
   title: string;
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-4 py-6 first:pt-0">
-      <div className="space-y-1">
+    <section id={id} className="scroll-mt-24 space-y-5 py-7 first:pt-0">
+      <div className="space-y-2">
         <div className="kicker">{label}</div>
-        <h3 className="font-heading text-[18px] font-semibold text-foreground">{title}</h3>
+        <h3 className="font-heading text-[20px] font-semibold tracking-[-0.03em] text-foreground">
+          {title}
+        </h3>
       </div>
       {children}
     </section>
@@ -61,8 +66,8 @@ export function FindingDetail({
 
   return (
     <div className="technical-sheet min-h-[540px] p-6">
-      <div className="grid gap-6 border-b border-border/80 pb-6 xl:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="space-y-4">
+      <div className="grid gap-8 border-b-2 border-border pb-8 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="space-y-5">
           <div className="flex flex-wrap items-center gap-3">
             <Badge variant={finding.severity.toLowerCase() as "critical" | "warning" | "info"}>
               {severityLabel(finding.severity)}
@@ -72,81 +77,100 @@ export function FindingDetail({
           </div>
 
           <div>
-            <h2 className="max-w-3xl font-heading text-[30px] font-semibold tracking-[-0.02em] text-foreground">
-              {finding.title}
-            </h2>
-            <p className="mt-3 max-w-3xl text-[15px] leading-7 text-slate-600">
-              {finding.message}
-            </p>
+            <h2 className="report-title max-w-3xl">{finding.title}</h2>
+            <p className="report-lead mt-4">{finding.message}</p>
           </div>
         </div>
 
-        <div className="grid gap-4 border-l border-border/80 pl-0 xl:pl-6">
+        <div className="detail-block grid gap-4 self-start p-5">
           <div className="kicker">At a glance</div>
           <dl className="grid gap-3">
-            <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-b border-border/70 pb-3">
+            <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-b-2 border-border pb-3">
               <dt className="text-sm text-slate-500">Object</dt>
               <dd className="data-mono text-[12px] text-slate-700">{finding.resource_name}</dd>
             </div>
-            <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-b border-border/70 pb-3">
+            <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-b-2 border-border pb-3">
               <dt className="text-sm text-slate-500">Confidence</dt>
               <dd className="metric-value">{finding.confidence_label}</dd>
             </div>
-            <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-b border-border/70 pb-3">
+            <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3 border-b-2 border-border pb-3">
               <dt className="text-sm text-slate-500">Detected</dt>
               <dd className="metric-value">{formatTimestamp(finding.detected_at)}</dd>
             </div>
             <div className="grid grid-cols-[110px_minmax(0,1fr)] gap-3">
               <dt className="text-sm text-slate-500">Status</dt>
-              <dd className="metric-value">{finding.status}</dd>
+              <dd>
+                <span
+                  className={`inline-flex rounded-md border px-2.5 py-1 text-[12px] font-medium ${statusClasses(
+                    finding.status,
+                  )}`}
+                >
+                  {finding.status}
+                </span>
+              </dd>
             </div>
           </dl>
         </div>
       </div>
 
-      <DetailSection label="Problem" title="What is going wrong">
-        <div className="max-w-4xl text-[15px] leading-7 text-slate-700">
-          {finding.problem_summary}
+      <div className="flex flex-wrap gap-2 border-b-2 border-border py-4">
+        {[
+          { href: "#problem", label: "Problem" },
+          { href: "#evidence", label: "Evidence" },
+          { href: "#action", label: "Action" },
+          { href: "#verification", label: "Verification" },
+        ].map((item) => (
+          <a
+            key={item.href}
+            href={item.href}
+            className="rounded-md border-2 border-[#111111] bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-700 shadow-[2px_2px_0_#111111] transition-all hover:-translate-x-[1px] hover:-translate-y-[1px] hover:bg-[#f4f1e6] hover:shadow-[3px_3px_0_#111111]"
+          >
+            {item.label}
+          </a>
+        ))}
+      </div>
+
+      <DetailSection id="problem" label="Summary" title="What is happening">
+        <div className="summary-strip max-w-4xl px-5 py-4">
+          <p className="text-[15px] leading-7 text-slate-700">{finding.problem_summary}</p>
         </div>
       </DetailSection>
 
       <div className="section-rule" />
 
-      <DetailSection label="Evidence" title="Why Postgresome believes this">
+      <DetailSection id="evidence" label="Evidence" title="Why Postgresome believes this">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(260px,0.9fr)]">
           <div className="space-y-4">
-            <div className="rounded-lg border bg-[#f8f9ff] p-4">
-              <p className="text-[15px] leading-7 text-slate-700">
-                {finding.evidence_summary}
-              </p>
+            <div className="max-w-4xl">
+              <p className="text-[15px] leading-7 text-slate-700">{finding.evidence_summary}</p>
 
               {history ? (
-                <div className="mt-4 grid gap-0 rounded-md border bg-white sm:grid-cols-3">
-                  <div className="p-4 sm:border-r">
+                <div className="summary-strip mt-5 grid gap-0 sm:grid-cols-3">
+                  <div className="p-4 sm:border-r-2 sm:border-border">
                     <div className="kicker">Current</div>
-                    <div className="mt-2 font-heading text-[24px] font-semibold text-foreground">
-                      {formatNumber(history.current_value)}
+                      <div className="mt-2 font-heading text-[22px] font-semibold tracking-[-0.03em] text-foreground">
+                        {formatNumber(history.current_value)}
+                      </div>
                     </div>
-                  </div>
-                  <div className="p-4 sm:border-r">
+                  <div className="p-4 sm:border-r-2 sm:border-border">
                     <div className="kicker">Baseline</div>
-                    <div className="mt-2 font-heading text-[24px] font-semibold text-foreground">
-                      {formatNumber(history.baseline_value)}
+                      <div className="mt-2 font-heading text-[22px] font-semibold tracking-[-0.03em] text-foreground">
+                        {formatNumber(history.baseline_value)}
+                      </div>
                     </div>
-                  </div>
                   <div className="p-4">
                     <div className="kicker">Change</div>
-                    <div className="mt-2 font-heading text-[24px] font-semibold text-foreground">
-                      {formatPercent(history.change_percent)}
+                      <div className="mt-2 font-heading text-[22px] font-semibold tracking-[-0.03em] text-foreground">
+                        {formatPercent(history.change_percent)}
+                      </div>
                     </div>
-                  </div>
                 </div>
               ) : null}
             </div>
 
             {evidence && evidence.length > 0 ? (
-              <div className="overflow-hidden rounded-lg border">
-                <div className="border-b bg-[#f8f9ff] px-4 py-3">
+              <div className="overflow-hidden rounded-md border-2 border-[#111111] shadow-[2px_2px_0_#111111]">
+                <div className="border-b-2 border-[#111111] bg-[#f4f1e6] px-4 py-3">
                   <div className="kicker">Supporting signals</div>
                 </div>
                 <div className="divide-y">
@@ -173,18 +197,18 @@ export function FindingDetail({
             ) : null}
 
             {related_query ? (
-              <div className="rounded-lg border bg-[#f8f9ff] p-4">
+              <div className="detail-block p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div className="kicker">Related query</div>
                   <Link
-                    to={`/queries?focus=${encodeURIComponent(related_query.query_id)}`}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-slate-700 hover:text-slate-900"
+                    to={`/queries/${encodeURIComponent(related_query.query_id)}`}
+                    className="inline-flex items-center gap-2 text-[12px] font-medium text-slate-700 hover:text-slate-900"
                   >
                     Open in Query Explorer
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
-                <pre className="overflow-x-auto rounded-md border bg-[#eff4ff] p-4 font-mono text-[12px] leading-6 text-[#0b1c30]">
+                <pre className="overflow-x-auto rounded-md border-2 border-[#111111] bg-slate-950 p-4 font-mono text-[12px] leading-6 text-white shadow-[2px_2px_0_#111111]">
                   {related_query.query}
                 </pre>
               </div>
@@ -192,10 +216,10 @@ export function FindingDetail({
           </div>
 
           <div className="space-y-4 xl:w-[400px]">
-            <div className="rounded-lg border p-4">
+            <div className="detail-block p-4">
               <div className="kicker">Impact</div>
               <div className="mt-3 flex items-start gap-3">
-                <ShieldAlert className="mt-0.5 h-4 w-4 text-slate-500" />
+                <ShieldAlert className="mt-0.5 h-4 w-4 text-slate-700" />
                 <div>
                   <div className="text-sm font-semibold text-foreground">
                     {finding.primary_impact.label}
@@ -214,10 +238,10 @@ export function FindingDetail({
             </div>
 
             {related_table ? (
-              <div className="rounded-lg border p-4">
+              <div className="detail-block p-4">
                 <div className="kicker">Affected table</div>
                 <div className="mt-3 flex items-start gap-3">
-                  <Database className="mt-0.5 h-4 w-4 text-slate-500" />
+                  <Database className="mt-0.5 h-4 w-4 text-slate-700" />
                   <div className="space-y-2">
                     <div className="text-sm font-semibold text-foreground">
                       {related_table.schema_name}.{related_table.table_name}
@@ -242,10 +266,10 @@ export function FindingDetail({
             ) : null}
 
             {related_query ? (
-              <div className="rounded-lg border p-4">
+              <div className="detail-block p-4">
                 <div className="kicker">Query load</div>
                 <div className="mt-3 flex items-start gap-3">
-                  <Gauge className="mt-0.5 h-4 w-4 text-slate-500" />
+                  <Gauge className="mt-0.5 h-4 w-4 text-slate-700" />
                   <div className="grid flex-1 grid-cols-2 gap-3">
                     <div>
                       <div className="meta">Mean latency</div>
@@ -269,8 +293,8 @@ export function FindingDetail({
 
       <div className="section-rule" />
 
-      <DetailSection label="Recommended next step" title={finding.primary_action.label}>
-        <div className="rounded-lg border bg-[#f8f9ff] p-5">
+      <DetailSection id="action" label="Recommended next step" title={finding.primary_action.label}>
+        <div className="detail-block border-slate-950/90 p-5">
           <p className="max-w-3xl text-[15px] leading-7 text-slate-700">
             {finding.primary_action.summary}
           </p>
@@ -278,7 +302,7 @@ export function FindingDetail({
           {(finding.secondary_actions || []).length > 0 ? (
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {finding.secondary_actions?.map((action) => (
-                <div key={action.code} className="rounded-md border bg-white p-4">
+                <div key={action.code} className="rounded-md border-2 border-[#111111] bg-white p-4 shadow-[2px_2px_0_#111111]">
                   <div className="text-sm font-semibold text-foreground">{action.label}</div>
                   <p className="mt-2 text-sm leading-6 text-slate-600">{action.summary}</p>
                 </div>
@@ -289,7 +313,7 @@ export function FindingDetail({
           <div className="mt-6 flex flex-wrap gap-3">
             {related_query ? (
               <Button asChild>
-                <Link to={`/queries?focus=${encodeURIComponent(related_query.query_id)}`}>
+                <Link to={`/queries/${encodeURIComponent(related_query.query_id)}`}>
                   <FileSearch className="h-4 w-4" />
                   Investigate related query
                 </Link>
@@ -302,8 +326,8 @@ export function FindingDetail({
 
       <div className="section-rule" />
 
-      <DetailSection label="Verification" title="How to confirm the fix">
-        <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-start">
+      <DetailSection id="verification" label="Verification" title="How to confirm the fix">
+        <div className="summary-strip grid gap-4 px-5 py-4 sm:grid-cols-[1fr_auto] sm:items-start">
           <div>
             <p className="text-[15px] leading-7 text-slate-700">
               {finding.verification_summary || finding.verification_hint}
