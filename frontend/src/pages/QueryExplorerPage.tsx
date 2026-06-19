@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { DismissibleAlert } from "@/components/ui/dismissible-alert";
 import { Input } from "@/components/ui/input";
 import { listQueries } from "@/lib/api";
-import { formatDurationMs, formatNumber, formatTimestamp } from "@/lib/format";
+import { formatDurationMs, formatNumber, formatRelativeTime, formatTimestamp } from "@/lib/format";
 import { useWorkspace } from "@/lib/workspace-context";
 import type { QueryStatsResponse } from "@/types/api";
 
@@ -83,10 +83,11 @@ export function QueryExplorerPage() {
       </div>
 
       <div className="technical-sheet overflow-hidden">
-        <div className="table-header hidden md:grid md:grid-cols-[160px_minmax(0,1fr)_220px_40px] md:items-center">
+        <div className="table-header hidden md:grid md:grid-cols-[160px_minmax(0,1fr)_220px_140px_40px] md:items-center">
           <div>Query id</div>
           <div>Normalized SQL</div>
           <div>Stats</div>
+          <div>Collected</div>
           <div />
         </div>
 
@@ -105,7 +106,7 @@ export function QueryExplorerPage() {
                 <Link
                   key={query.query_id}
                   to={`/queries/${encodeURIComponent(query.query_id)}`}
-                  className={`table-row grid gap-4 px-6 py-5 md:grid-cols-[160px_minmax(0,1fr)_220px_40px] md:items-center ${
+                  className={`table-row grid gap-4 px-6 py-5 md:grid-cols-[160px_minmax(0,1fr)_220px_140px_40px] md:items-center ${
                     focused ? "surface-selection" : ""
                   }`}
                 >
@@ -137,6 +138,11 @@ export function QueryExplorerPage() {
                       <div className="kicker md:hidden">Calls</div>
                       <div className="metric-value mt-2">{formatNumber(query.calls)}</div>
                     </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="kicker md:hidden">Collected</div>
+                    <div className="meta">{formatRelativeTime(data?.collected_at)}</div>
                   </div>
 
                   <div className="hidden justify-self-end md:block">
